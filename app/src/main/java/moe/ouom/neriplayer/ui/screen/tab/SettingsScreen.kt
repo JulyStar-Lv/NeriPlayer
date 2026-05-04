@@ -50,7 +50,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.AltRoute
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.outlined.AdsClick
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Cloud
@@ -116,8 +116,6 @@ import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.core.download.GlobalDownloadManager
 import moe.ouom.neriplayer.core.download.ManagedDownloadStorage
-import moe.ouom.neriplayer.data.auth.common.SavedCookieAuthState
-import moe.ouom.neriplayer.data.auth.youtube.YouTubeAuthState
 import moe.ouom.neriplayer.data.local.playlist.LocalPlaylistRepository
 import moe.ouom.neriplayer.data.settings.MAX_LYRIC_FONT_SCALE
 import moe.ouom.neriplayer.data.settings.MIN_LYRIC_FONT_SCALE
@@ -130,9 +128,6 @@ import moe.ouom.neriplayer.ui.LocalMiniPlayerHeight
 import moe.ouom.neriplayer.ui.component.LanguageSettingItem
 import moe.ouom.neriplayer.util.HapticTextButton
 import moe.ouom.neriplayer.ui.screen.tab.settings.about.settingsAboutSection
-import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsBiliAuthDialogs
-import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsNeteaseAuthDialogs
-import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.ExpandableHeader
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.LazyAnimatedVisibility
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsAudioQualitySection
@@ -145,21 +140,12 @@ import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsStorageCache
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeModeActionButton
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeSeedListItem
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.UiScaleListItem
-import moe.ouom.neriplayer.ui.screen.tab.settings.component.maskCookieValue
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.settingsItemClickable
 import moe.ouom.neriplayer.ui.screen.tab.settings.dialog.SettingsGitHubDialogs
 import moe.ouom.neriplayer.ui.screen.tab.settings.dialog.SettingsPreferenceDialogs
 import moe.ouom.neriplayer.ui.screen.tab.settings.dialog.SettingsWebDavDialogs
-import moe.ouom.neriplayer.ui.screen.tab.settings.state.collectAsStateWithLifecycleCompat
-import moe.ouom.neriplayer.ui.screen.tab.settings.state.formatSyncTime
 import moe.ouom.neriplayer.ui.viewmodel.BackupRestoreViewModel
 import moe.ouom.neriplayer.ui.viewmodel.ConfigTransferViewModel
-import moe.ouom.neriplayer.ui.viewmodel.auth.BiliAuthEvent
-import moe.ouom.neriplayer.ui.viewmodel.auth.BiliAuthViewModel
-import moe.ouom.neriplayer.ui.viewmodel.auth.YouTubeAuthEvent
-import moe.ouom.neriplayer.ui.viewmodel.auth.YouTubeAuthViewModel
-import moe.ouom.neriplayer.ui.viewmodel.debug.NeteaseAuthEvent
-import moe.ouom.neriplayer.ui.viewmodel.debug.NeteaseAuthViewModel
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
@@ -260,6 +246,8 @@ fun SettingsScreen(
     onAutoShowKeyboardChange: (Boolean) -> Unit,
     showHomeContinueCard: Boolean,
     onShowHomeContinueCardChange: (Boolean) -> Unit,
+    showHomeRecentCard: Boolean,
+    onShowHomeRecentCardChange: (Boolean) -> Unit,
     showHomeTrendingCard: Boolean,
     onShowHomeTrendingCardChange: (Boolean) -> Unit,
     showHomeRadarCard: Boolean,
@@ -267,6 +255,7 @@ fun SettingsScreen(
     showHomeRecommendedCard: Boolean,
     onShowHomeRecommendedCardChange: (Boolean) -> Unit,
     homeHasRecentUsage: Boolean,
+    homeHasRecentPlays: Boolean,
     playbackFadeIn: Boolean,
     onPlaybackFadeInChange: (Boolean) -> Unit,
     playbackCrossfadeNext: Boolean,
@@ -396,19 +385,9 @@ fun SettingsScreen(
 
     // 各种对话框和弹窗的显示状态 //
     var showQualityDialog by remember { mutableStateOf(false) }
-    var showNeteaseSheet by remember { mutableStateOf(false) }
     var showYouTubeQualityDialog by remember { mutableStateOf(false) }
     var showBiliQualityDialog by remember { mutableStateOf(false) }
     var showDefaultStartDestinationDialog by remember { mutableStateOf(false) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
-    var showCookieDialog by remember { mutableStateOf(false) }
-    var showNeteaseSavedCookieDialog by remember { mutableStateOf(false) }
-    var showBiliSheet by remember { mutableStateOf(false) }
-    var showBiliCookieDialog by remember { mutableStateOf(false) }
-    var showBiliSavedCookieDialog by remember { mutableStateOf(false) }
-    var showYouTubeSheet by remember { mutableStateOf(false) }
-    var showYouTubeCookieDialog by remember { mutableStateOf(false) }
-    var showYouTubeSavedCookieDialog by remember { mutableStateOf(false) }
 
     var showColorPickerDialog by remember { mutableStateOf(false) }
     var showDpiDialog by remember { mutableStateOf(false) }
@@ -423,22 +402,12 @@ fun SettingsScreen(
     var listenTogetherServerTestMessage by remember { mutableStateOf<String?>(null) }
     // ------------------------------------
 
-    val neteaseVm: NeteaseAuthViewModel = viewModel()
     var inlineMsg by remember { mutableStateOf<String?>(null) }
     var pendingDownloadDirectoryChange by remember { mutableStateOf<PendingDownloadDirectoryChange?>(null) }
     var isMigratingDownloadDirectory by remember { mutableStateOf(false) }
     val migrationProgress by ManagedDownloadStorage.migrationProgressFlow.collectAsState()
     val hasActiveDownloadOperations by GlobalDownloadManager.activeDownloadOperationsFlow.collectAsState()
-    var confirmPhoneMasked by remember { mutableStateOf<String?>(null) }
-    var cookieText by remember { mutableStateOf("") }
     var versionTapCount by remember { mutableIntStateOf(0) }
-    var biliCookieText by remember { mutableStateOf("") }
-    val biliVm: BiliAuthViewModel = viewModel()
-    var biliSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
-    var neteaseSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
-    var youtubeCookieText by remember { mutableStateOf("") }
-    val youtubeVm: YouTubeAuthViewModel = viewModel()
-    var youtubeSheetInitialTab by rememberSaveable { mutableIntStateOf(0) }
     
     // 备份与恢复
     val backupRestoreVm: BackupRestoreViewModel = viewModel()
@@ -740,7 +709,8 @@ fun SettingsScreen(
         showHomeTrendingCard ||
             showHomeRadarCard ||
             showHomeRecommendedCard ||
-            (showHomeContinueCard && homeHasRecentUsage)
+            (showHomeContinueCard && homeHasRecentUsage) ||
+            (showHomeRecentCard && homeHasRecentPlays)
     val homeTrendingLabelRes = if (internationalEnabled) {
         R.string.home_ytmusic_guess_you_like
     } else {
@@ -791,71 +761,6 @@ fun SettingsScreen(
             else -> context.getString(R.string.nav_home)
         }
     }
-    LaunchedEffect(neteaseVm) {
-        neteaseVm.events.collect { e ->
-            when (e) {
-                is NeteaseAuthEvent.ShowSnack -> {
-                    inlineMsg = e.message
-                }
-                is NeteaseAuthEvent.AskConfirmSend -> {
-                    confirmPhoneMasked = e.masked
-                    showConfirmDialog = true
-                }
-                NeteaseAuthEvent.LoginSuccess -> {
-                    showNeteaseSavedCookieDialog = false
-                    inlineMsg = null
-                    showNeteaseSheet = false
-                    inlineMsg = context.getString(R.string.settings_netease_login_success)
-                    neteaseVm.refreshAuthHealth()
-                }
-                is NeteaseAuthEvent.ShowCookies -> {
-                    cookieText = e.cookies.entries.joinToString("\n") { (k, v) -> "$k=${maskCookieValue(v)}" }
-                    showCookieDialog = true
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(biliVm) {
-        biliVm.events.collect { e ->
-            when (e) {
-                is BiliAuthEvent.ShowSnack -> inlineMsg = e.message
-                is BiliAuthEvent.ShowCookies -> {
-                    biliCookieText = e.cookies.entries.joinToString("\n") { (k, v) -> "$k=${maskCookieValue(v)}" }
-                    showBiliCookieDialog = true
-                }
-                BiliAuthEvent.LoginSuccess -> {
-                    showBiliSavedCookieDialog = false
-                    showBiliSheet = false
-                    inlineMsg = context.getString(R.string.settings_bili_login_success)
-                    biliVm.refreshAuthHealth()
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(youtubeVm) {
-        youtubeVm.events.collect { e ->
-            when (e) {
-                is YouTubeAuthEvent.ShowSnack -> inlineMsg = e.message
-                is YouTubeAuthEvent.ShowCookies -> {
-                    youtubeCookieText = e.cookies.entries.joinToString("\n") { (k, v) ->
-                        "$k=${maskCookieValue(v)}"
-                    }
-                    showYouTubeCookieDialog = true
-                }
-                YouTubeAuthEvent.LoginSuccess -> {
-                    showYouTubeSavedCookieDialog = false
-                    showYouTubeSheet = false
-                    inlineMsg = context.getString(R.string.settings_youtube_login_success)
-                    youtubeVm.refreshAuthHealth()
-                }
-
-            }
-        }
-    }
-
-
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
@@ -1008,61 +913,6 @@ fun SettingsScreen(
                 )
             }
 
-            // 登录三方平台
-            item {
-                ExpandableHeader(
-                    icon = Icons.Filled.AccountCircle,
-                    title = stringResource(R.string.settings_login_platforms),
-                    subtitleCollapsed = stringResource(R.string.settings_login_platforms_expand),
-                    subtitleExpanded = stringResource(R.string.settings_login_platforms_collapse),
-                    expanded = loginExpanded,
-                    onToggle = { loginExpanded = !loginExpanded },
-                    arrowRotation = arrowRotation
-                )
-            }
-
-            // 展开区域
-            item {
-                LazyAnimatedVisibility(
-                    visible = loginExpanded,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    SettingsLoginExpandedContent(
-                        biliVm = biliVm,
-                        youtubeVm = youtubeVm,
-                        neteaseVm = neteaseVm,
-                        onOpenBiliSheet = { tab ->
-                            inlineMsg = null
-                            biliSheetInitialTab = tab
-                            showBiliSheet = true
-                        },
-                        onOpenBiliSavedCookieDialog = {
-                            inlineMsg = null
-                            showBiliSavedCookieDialog = true
-                        },
-                        onOpenYouTubeSavedCookieDialog = {
-                            inlineMsg = null
-                            showYouTubeSavedCookieDialog = true
-                        },
-                        onOpenNeteaseSavedCookieDialog = {
-                            inlineMsg = null
-                            showNeteaseSavedCookieDialog = true
-                        },
-                        onOpenYouTubeSheet = {
-                            inlineMsg = null
-                            youtubeSheetInitialTab = 0
-                            showYouTubeSheet = true
-                        },
-                        onOpenNeteaseSheet = {
-                            inlineMsg = null
-                            neteaseSheetInitialTab = 0
-                            showNeteaseSheet = true
-                        }
-                    )
-                }
-            }
-
             item {
                 ExpandableHeader(
                     icon = Icons.Outlined.Tune,
@@ -1154,7 +1004,7 @@ fun SettingsScreen(
                             },
                             leadingContent = {
                                 Icon(
-                                    imageVector = Icons.Outlined.History,
+                                    imageVector = Icons.AutoMirrored.Outlined.PlaylistPlay,
                                     contentDescription = stringResource(R.string.player_continue),
                                     modifier = Modifier.size(24.dp),
                                     tint = MaterialTheme.colorScheme.onSurface
@@ -1165,6 +1015,28 @@ fun SettingsScreen(
                                 Switch(
                                     checked = showHomeContinueCard,
                                     onCheckedChange = onShowHomeContinueCardChange
+                                )
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+
+                        ListItem(
+                            modifier = Modifier.settingsItemClickable {
+                                onShowHomeRecentCardChange(!showHomeRecentCard)
+                            },
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Outlined.History,
+                                    contentDescription = stringResource(R.string.recent_title),
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            headlineContent = { Text(stringResource(R.string.recent_title)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = showHomeRecentCard,
+                                    onCheckedChange = onShowHomeRecentCardChange
                                 )
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -1850,79 +1722,6 @@ fun SettingsScreen(
         }
     }
 
-    SettingsNeteaseAuthDialogs(
-        showSheet = showNeteaseSheet,
-        initialTab = neteaseSheetInitialTab,
-        onDismissSheet = { showNeteaseSheet = false },
-        inlineMsg = inlineMsg,
-        onInlineMsgChange = { inlineMsg = it },
-        showConfirmDialog = showConfirmDialog,
-        confirmPhoneMasked = confirmPhoneMasked,
-        onDismissConfirmDialog = { showConfirmDialog = false },
-        vm = neteaseVm,
-        showCookieDialog = showCookieDialog,
-        cookieText = cookieText,
-        onDismissCookieDialog = { showCookieDialog = false },
-        showSavedCookieDialog = showNeteaseSavedCookieDialog,
-        onDismissSavedCookieDialog = { showNeteaseSavedCookieDialog = false },
-        onOpenSheetAtTab = { tab ->
-            inlineMsg = null
-            neteaseSheetInitialTab = tab
-            showNeteaseSheet = true
-        },
-        onLogout = {
-            showNeteaseSavedCookieDialog = false
-            neteaseVm.clearCookies()
-        },
-        onBrowserLogin = null
-    )
-
-    SettingsBiliAuthDialogs(
-        showSheet = showBiliSheet,
-        initialTab = biliSheetInitialTab,
-        onDismissSheet = { showBiliSheet = false },
-        inlineMsg = inlineMsg,
-        onInlineMsgChange = { inlineMsg = it },
-        vm = biliVm,
-        showCookieDialog = showBiliCookieDialog,
-        cookieText = biliCookieText,
-        onDismissCookieDialog = { showBiliCookieDialog = false },
-        showSavedCookieDialog = showBiliSavedCookieDialog,
-        onDismissSavedCookieDialog = { showBiliSavedCookieDialog = false },
-        onOpenSheetAtTab = { tab ->
-            inlineMsg = null
-            biliSheetInitialTab = tab
-            showBiliSheet = true
-        },
-        onLogout = {
-            showBiliSavedCookieDialog = false
-            biliVm.clearCookies()
-        },
-        onBrowserLogin = null
-    )
-
-    SettingsYouTubeAuthDialogs(
-        showSheet = showYouTubeSheet,
-        initialTab = youtubeSheetInitialTab,
-        onDismissSheet = { showYouTubeSheet = false },
-        inlineMsg = inlineMsg,
-        onInlineMsgChange = { inlineMsg = it },
-        vm = youtubeVm,
-        showCookieDialog = showYouTubeCookieDialog,
-        cookieText = youtubeCookieText,
-        onDismissCookieDialog = { showYouTubeCookieDialog = false },
-        showSavedCookieDialog = showYouTubeSavedCookieDialog,
-        onDismissSavedCookieDialog = { showYouTubeSavedCookieDialog = false },
-        onOpenSheetAtTab = { tab ->
-            inlineMsg = null
-            youtubeSheetInitialTab = tab
-            showYouTubeSheet = true
-        },
-        onLogout = {
-            showYouTubeSavedCookieDialog = false
-            youtubeVm.clearAuth()
-        }
-    )
     SettingsPreferenceDialogs(
         showDefaultStartDestinationDialog = showDefaultStartDestinationDialog,
         onShowDefaultStartDestinationDialogChange = { showDefaultStartDestinationDialog = it },
@@ -2413,182 +2212,3 @@ private fun ListenTogetherSettingsSection(
         )
     }
 }
-
-@Composable
-private fun SettingsLoginExpandedContent(
-    biliVm: BiliAuthViewModel,
-    youtubeVm: YouTubeAuthViewModel,
-    neteaseVm: NeteaseAuthViewModel,
-    onOpenBiliSheet: (Int) -> Unit,
-    onOpenBiliSavedCookieDialog: () -> Unit,
-    onOpenYouTubeSavedCookieDialog: () -> Unit,
-    onOpenNeteaseSavedCookieDialog: () -> Unit,
-    onOpenYouTubeSheet: () -> Unit,
-    onOpenNeteaseSheet: () -> Unit,
-) {
-    val biliAuthUiState by biliVm.uiState.collectAsStateWithLifecycleCompat()
-    val youtubeAuthUiState by youtubeVm.uiState.collectAsStateWithLifecycleCompat()
-    val neteaseAuthUiState by neteaseVm.uiState.collectAsStateWithLifecycleCompat()
-
-    LaunchedEffect(biliVm, youtubeVm, neteaseVm) {
-        biliVm.refreshAuthHealth()
-        neteaseVm.refreshAuthHealth()
-        youtubeVm.refreshAuthHealth()
-    }
-
-    val biliStatusText = when (biliAuthUiState.health.state) {
-        SavedCookieAuthState.Valid -> {
-            val relativeTime = biliAuthUiState.health.savedAt
-                .takeIf { it > 0L }
-                ?.let { formatSyncTime(it) }
-                ?: stringResource(R.string.time_just_now)
-            stringResource(R.string.settings_bili_status_valid, relativeTime)
-        }
-        SavedCookieAuthState.Checking -> {
-            if (biliAuthUiState.hasSavedCookies) {
-                stringResource(R.string.settings_bili_status_saved_invalid)
-            } else {
-                stringResource(R.string.settings_bili_status_missing)
-            }
-        }
-        SavedCookieAuthState.Missing -> {
-            if (biliAuthUiState.hasSavedCookies) {
-                stringResource(R.string.settings_bili_status_saved_invalid)
-            } else {
-                stringResource(R.string.settings_bili_status_missing)
-            }
-        }
-    }
-    val neteaseStatusText = when (neteaseAuthUiState.health.state) {
-        SavedCookieAuthState.Valid -> {
-            val relativeTime = neteaseAuthUiState.health.savedAt
-                .takeIf { it > 0L }
-                ?.let { formatSyncTime(it) }
-                ?: stringResource(R.string.time_just_now)
-            stringResource(R.string.settings_netease_status_valid, relativeTime)
-        }
-        SavedCookieAuthState.Checking -> {
-            if (neteaseAuthUiState.hasSavedCookies) {
-                stringResource(R.string.settings_netease_status_saved_invalid)
-            } else {
-                stringResource(R.string.settings_netease_status_missing)
-            }
-        }
-        SavedCookieAuthState.Missing -> {
-            if (neteaseAuthUiState.hasSavedCookies) {
-                stringResource(R.string.settings_netease_status_saved_invalid)
-            } else {
-                stringResource(R.string.settings_netease_status_missing)
-            }
-        }
-    }
-    val youtubeStatusText = when (youtubeAuthUiState.health.state) {
-        YouTubeAuthState.Valid -> {
-            val relativeTime = youtubeAuthUiState.health.savedAt
-                .takeIf { it > 0L }
-                ?.let { formatSyncTime(it) }
-                ?: stringResource(R.string.time_just_now)
-            stringResource(R.string.settings_youtube_status_valid, relativeTime)
-        }
-        YouTubeAuthState.Missing -> {
-            if (youtubeAuthUiState.hasSavedAuth) {
-                stringResource(R.string.settings_youtube_status_saved_invalid)
-            } else {
-                stringResource(R.string.settings_youtube_status_missing)
-            }
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Transparent)
-            .padding(start = 16.dp, end = 8.dp, bottom = 8.dp)
-    ) {
-        ListItem(
-            leadingContent = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_bilibili),
-                    contentDescription = stringResource(R.string.settings_bilibili),
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            headlineContent = { Text(stringResource(R.string.platform_bilibili)) },
-            supportingContent = { Text(biliStatusText) },
-            modifier = Modifier.settingsItemClickable(
-                onClick = {
-                    if (biliAuthUiState.hasSavedCookies) {
-                        onOpenBiliSavedCookieDialog()
-                    } else {
-                        onOpenBiliSheet(0)
-                    }
-                }
-            ),
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
-        ListItem(
-            leadingContent = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_youtube),
-                    contentDescription = stringResource(R.string.common_youtube),
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            headlineContent = { Text(stringResource(R.string.common_youtube)) },
-            supportingContent = { Text(youtubeStatusText) },
-            modifier = Modifier.settingsItemClickable(
-                onClick = {
-                    if (youtubeAuthUiState.hasSavedAuth) {
-                        onOpenYouTubeSavedCookieDialog()
-                    } else {
-                        onOpenYouTubeSheet()
-                    }
-                }
-            ),
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
-        ListItem(
-            leadingContent = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_netease_cloud_music),
-                    contentDescription = stringResource(R.string.settings_netease),
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            headlineContent = { Text(stringResource(R.string.platform_netease)) },
-            supportingContent = { Text(neteaseStatusText) },
-            modifier = Modifier.settingsItemClickable(
-                onClick = {
-                    if (neteaseAuthUiState.hasSavedCookies) {
-                        onOpenNeteaseSavedCookieDialog()
-                    } else {
-                        onOpenNeteaseSheet()
-                    }
-                }
-            ),
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
-        ListItem(
-            leadingContent = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_qq_music),
-                    contentDescription = stringResource(R.string.settings_qq_music),
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            headlineContent = { Text(stringResource(R.string.settings_qq_music)) },
-            supportingContent = { Text(stringResource(R.string.common_coming_soon)) },
-            modifier = Modifier.settingsItemClickable { },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-    }
-}
-
-

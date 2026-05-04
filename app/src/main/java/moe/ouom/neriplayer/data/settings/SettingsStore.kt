@@ -85,6 +85,7 @@ object SettingsKeys {
     val DEFAULT_START_DESTINATION = stringPreferencesKey("default_start_destination")
     val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard")
     val HOME_CARD_CONTINUE = booleanPreferencesKey("home_card_continue")
+    val HOME_CARD_RECENT = booleanPreferencesKey("home_card_recent")
     val HOME_CARD_TRENDING = booleanPreferencesKey("home_card_trending")
     val HOME_CARD_RADAR = booleanPreferencesKey("home_card_radar")
     val HOME_CARD_RECOMMENDED = booleanPreferencesKey("home_card_recommended")

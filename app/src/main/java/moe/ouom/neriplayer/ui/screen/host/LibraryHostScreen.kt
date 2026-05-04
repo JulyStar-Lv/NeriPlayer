@@ -87,8 +87,7 @@ sealed class LibrarySelectedItem : Parcelable {
 @Composable
 fun LibraryHostScreen(
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
-    onPlayParts: (BiliClient.VideoBasicInfo, Int, String) -> Unit = { _, _, _ -> },
-    onOpenRecent: () -> Unit
+    onPlayParts: (BiliClient.VideoBasicInfo, Int, String) -> Unit = { _, _, _ -> }
 ) {
     var selected by rememberSaveable(stateSaver = librarySelectedItemSaver) {
         mutableStateOf(null)
@@ -215,8 +214,7 @@ fun LibraryHostScreen(
                                 mid = playlist.mid,
                                 fid = playlist.fid
                             )
-                        },
-                        onOpenRecent = onOpenRecent
+                        }
                     )
                 }
             } else {

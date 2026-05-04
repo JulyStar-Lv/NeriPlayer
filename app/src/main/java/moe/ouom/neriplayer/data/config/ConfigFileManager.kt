@@ -314,6 +314,7 @@ private val SETTINGS_BOOLEAN_KEYS = listOf(
     SettingsKeys.SHOW_LYRIC_TRANSLATION,
     SettingsKeys.AUTO_SHOW_KEYBOARD,
     SettingsKeys.HOME_CARD_CONTINUE,
+    SettingsKeys.HOME_CARD_RECENT,
     SettingsKeys.HOME_CARD_TRENDING,
     SettingsKeys.HOME_CARD_RADAR,
     SettingsKeys.HOME_CARD_RECOMMENDED,

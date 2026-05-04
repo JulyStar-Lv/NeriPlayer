@@ -75,9 +75,11 @@ private sealed class HomeSelectedItem {
 @Composable
 fun HomeHostScreen(
     showContinueCard: Boolean = true,
+    showRecentCard: Boolean = true,
     showTrendingCard: Boolean = true,
     showRadarCard: Boolean = true,
     showRecommendedCard: Boolean = true,
+    onOpenRecentScreen: () -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> }
 ) {
     var selected by rememberSaveable(stateSaver = homeSelectedItemSaver) {
@@ -112,6 +114,7 @@ fun HomeHostScreen(
             if (current == null) {
                 HomeScreen(
                     showContinueCard = showContinueCard,
+                    showRecentCard = showRecentCard,
                     showTrendingCard = showTrendingCard,
                     showRadarCard = showRadarCard,
                     showRecommendedCard = showRecommendedCard,
@@ -138,6 +141,7 @@ fun HomeHostScreen(
                     onOpenRecent = { entry ->
                         openRecent(entry) { next -> selected = next }
                     },
+                    onOpenRecentScreen = onOpenRecentScreen,
                     onSongClick = onSongClick    // 透传给 HomeScreen，点击推荐歌曲可直接播放
                 )
             } else {

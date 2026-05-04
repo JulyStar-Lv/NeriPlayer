@@ -1379,12 +1379,22 @@
     <string name="library_youtube_music_open_playlist">打开歌单</string>
     <string name="library_youtube_music_copy_browse_id">复制 Browse ID</string>
     <string name="library_youtube_music_copy_playlist_id">复制 Playlist ID</string>
+    <string name="library_platform_accounts">平台账号</string>
+    <string name="library_platform_accounts_desc">连接平台后，媒体库会自动载入歌单、收藏夹和专辑</string>
+    <string name="library_platform_login">登录</string>
+    <string name="library_platform_manage">管理</string>
+    <string name="library_platform_refresh_login">刷新登录</string>
+    <string name="library_platform_connect_platform">连接 %1$s</string>
+    <string name="library_platform_empty_netease_playlist">登录后会从网易云拉取你的歌单</string>
+    <string name="library_platform_empty_netease_album">登录后会从网易云拉取你收藏的专辑</string>
+    <string name="library_platform_empty_bilibili">登录后会从哔哩哔哩拉取你的收藏夹</string>
+    <string name="library_platform_empty_youtube">登录后会从 YouTube Music 拉取你的歌单</string>
+    <string name="library_platform_qqmusic_auth_hint">QQ 音乐库页和登录能力还在开发中</string>
     <string name="library_favorite_source_format" formatted="false">%d首 · %s</string>
     <string name="library_favorite_sort_mode_title">收藏歌单排序</string>
     <string name="library_favorite_sort_mode_desc">长按歌单进入排序，拖动右侧手柄调整顺序</string>
     <string name="library_title">媒体库</string>
     <string name="library_coming_soon">敬请期待</string>
-    <string name="library_recent_played">最近播放</string>
     <string name="nowplaying_youtube_music">YouTube</string>
     <string name="library_delete_playlist_confirm">确定要删除歌单“%1$s”吗？</string>
 

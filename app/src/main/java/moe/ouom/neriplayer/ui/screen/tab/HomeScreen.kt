@@ -34,12 +34,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -53,6 +55,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.History
@@ -71,6 +74,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -85,8 +89,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -126,6 +128,7 @@ import moe.ouom.neriplayer.ui.viewmodel.tab.HomeViewModel
 import moe.ouom.neriplayer.ui.viewmodel.tab.PlaylistSummary
 import moe.ouom.neriplayer.ui.viewmodel.tab.YouTubeMusicPlaylist
 import moe.ouom.neriplayer.ui.viewmodel.tab.favoriteId
+import moe.ouom.neriplayer.ui.screen.toSongItems
 import moe.ouom.neriplayer.core.api.youtube.YouTubeMusicHomeShelf
 import moe.ouom.neriplayer.core.api.youtube.YouTubeMusicHomeItem
 import moe.ouom.neriplayer.core.api.youtube.YouTubeMusicParser
@@ -140,6 +143,7 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     showContinueCard: Boolean = true,
+    showRecentCard: Boolean = true,
     showTrendingCard: Boolean = true,
     showRadarCard: Boolean = true,
     showRecommendedCard: Boolean = true,
@@ -147,6 +151,7 @@ fun HomeScreen(
     onYouTubeMusicPlaylistClick: (YouTubeMusicPlaylist) -> Unit = {},
     gridState: LazyGridState,
     onOpenRecent: (UsageEntry) -> Unit = {},
+    onOpenRecentScreen: () -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
@@ -160,6 +165,8 @@ fun HomeScreen(
     )
     val ui by vm.uiState.collectAsState()
     val usage by AppContainer.playlistUsageRepo.frequentPlaylistsFlow.collectAsState(initial = emptyList())
+    val playHistory by AppContainer.playHistoryRepo.historyFlow.collectAsState(initial = emptyList())
+    val recentSongs = remember(playHistory) { playHistory.toSongItems() }
     val localPlaylistRepo = remember(context) { LocalPlaylistRepository.getInstance(context) }
     val localPlaylists by localPlaylistRepo.playlists.collectAsState()
     val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
@@ -205,9 +212,10 @@ fun HomeScreen(
     }
     val scope = rememberCoroutineScope()
     val showContinue = showContinueCard && usage.isNotEmpty()
+    val showRecent = showRecentCard && recentSongs.isNotEmpty()
     val isInternational = ui.internationalizationEnabled
     val hasVisibleSections =
-        showContinue || showTrendingCard || showRadarCard || showRecommendedCard || isInternational
+        showRecent || showContinue || showTrendingCard || showRadarCard || showRecommendedCard || isInternational
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -283,10 +291,27 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    if (showContinue) {
+                    if (showRecent) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             SectionHeader(
                                 icon = Icons.Outlined.History,
+                                title = stringResource(R.string.recent_title),
+                                actionLabel = stringResource(R.string.common_all),
+                                onActionClick = onOpenRecentScreen
+                            )
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            RecentPlaysSection(
+                                songs = recentSongs,
+                                onSongClick = onSongClick
+                            )
+                        }
+                    }
+
+                    if (showContinue) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            SectionHeader(
+                                icon = Icons.AutoMirrored.Outlined.PlaylistPlay,
                                 title = stringResource(R.string.player_continue)
                             )
                         }
@@ -327,18 +352,13 @@ fun HomeScreen(
 
                             when {
                                 ui.ytMusicPlaylists.items.isNotEmpty() -> {
-                                    items(
-                                        items = ui.ytMusicPlaylists.items,
-                                        key = { it.browseId }
-                                    ) { playlist ->
-                                        YtMusicPlaylistCard(
-                                            playlist = playlist,
-                                            isFavorite = favoriteKeys.contains("youtubeMusic:${playlist.favoriteId()}"),
-                                            onClick = { onYouTubeMusicPlaylistClick(playlist) },
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        YtMusicPlaylistRecommendationScroller(
+                                            playlists = ui.ytMusicPlaylists.items,
+                                            favoriteKeys = favoriteKeys,
+                                            onPlaylistClick = onYouTubeMusicPlaylistClick,
                                             onShowSnackbar = { message ->
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar(message)
-                                                }
+                                                scope.launch { snackbarHostState.showSnackbar(message) }
                                             }
                                         )
                                     }
@@ -378,16 +398,11 @@ fun HomeScreen(
                                                     title = shelf.title
                                                 )
                                             }
-                                            items(
-                                                items = playlistItems,
-                                                key = { shelf.title + it.title + it.browseId + it.videoId }
-                                            ) { homeItem ->
-                                                YtMusicHomeItemCard(
-                                                    item = homeItem,
-                                                    isFavorite = homeItem.toPlaylist()
-                                                        ?.favoriteId()
-                                                        ?.let { favoriteKeys.contains("youtubeMusic:$it") } == true,
-                                                    onClick = {
+                                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                                YtMusicHomeItemRecommendationScroller(
+                                                    homeItems = playlistItems,
+                                                    favoriteKeys = favoriteKeys,
+                                                    onHomeItemClick = { homeItem ->
                                                         val playlist = homeItem.toPlaylist()
                                                         if (playlist != null) {
                                                             onYouTubeMusicPlaylistClick(playlist)
@@ -401,9 +416,7 @@ fun HomeScreen(
                                                         }
                                                     },
                                                     onShowSnackbar = { message ->
-                                                        scope.launch {
-                                                            snackbarHostState.showSnackbar(message)
-                                                        }
+                                                        scope.launch { snackbarHostState.showSnackbar(message) }
                                                     }
                                                 )
                                             }
@@ -489,15 +502,13 @@ fun HomeScreen(
                             }
                             when {
                                 ui.playlists.items.isNotEmpty() -> {
-                                    items(items = ui.playlists.items, key = { it.id }) { item ->
-                                        PlaylistCard(
-                                            playlist = item,
-                                            isFavorite = favoriteKeys.contains("netease:${item.id}"),
-                                            onClick = { onItemClick(item) },
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        PlaylistRecommendationScroller(
+                                            playlists = ui.playlists.items,
+                                            favoriteKeys = favoriteKeys,
+                                            onItemClick = onItemClick,
                                             onShowSnackbar = { message ->
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar(message)
-                                                }
+                                                scope.launch { snackbarHostState.showSnackbar(message) }
                                             }
                                         )
                                     }
@@ -553,10 +564,17 @@ private fun <T> LazyGridScope.sectionContent(
 }
 
 @Composable
-private fun SectionHeader(icon: ImageVector, title: String) {
+private fun SectionHeader(
+    icon: ImageVector,
+    title: String,
+    actionLabel: String? = null,
+    onActionClick: (() -> Unit)? = null
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
         Icon(
             imageVector = icon,
@@ -566,8 +584,17 @@ private fun SectionHeader(icon: ImageVector, title: String) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-            modifier = Modifier.padding(start = 8.dp)
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .weight(1f)
         )
+        if (actionLabel != null && onActionClick != null) {
+            TextButton(onClick = onActionClick) {
+                Text(actionLabel)
+            }
+        }
     }
 }
 
@@ -755,6 +782,100 @@ fun PlaylistCard(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun PlaylistRecommendationScroller(
+    playlists: List<PlaylistSummary>,
+    favoriteKeys: Set<String>,
+    onItemClick: (PlaylistSummary) -> Unit,
+    onShowSnackbar: (String) -> Unit
+) {
+    RecommendationScroller(
+        recommendationItems = playlists,
+        itemKey = { it.id.toString() }
+    ) { playlist ->
+        PlaylistCard(
+            playlist = playlist,
+            isFavorite = favoriteKeys.contains("netease:${playlist.id}"),
+            onClick = { onItemClick(playlist) },
+            onShowSnackbar = onShowSnackbar
+        )
+    }
+}
+
+@Composable
+private fun YtMusicPlaylistRecommendationScroller(
+    playlists: List<YouTubeMusicPlaylist>,
+    favoriteKeys: Set<String>,
+    onPlaylistClick: (YouTubeMusicPlaylist) -> Unit,
+    onShowSnackbar: (String) -> Unit
+) {
+    RecommendationScroller(
+        recommendationItems = playlists,
+        itemKey = { it.favoriteId().toString() }
+    ) { playlist ->
+        YtMusicPlaylistCard(
+            playlist = playlist,
+            isFavorite = favoriteKeys.contains("youtubeMusic:${playlist.favoriteId()}"),
+            onClick = { onPlaylistClick(playlist) },
+            onShowSnackbar = onShowSnackbar
+        )
+    }
+}
+
+@Composable
+private fun YtMusicHomeItemRecommendationScroller(
+    homeItems: List<YouTubeMusicHomeItem>,
+    favoriteKeys: Set<String>,
+    onHomeItemClick: (YouTubeMusicHomeItem) -> Unit,
+    onShowSnackbar: (String) -> Unit
+) {
+    RecommendationScroller(
+        recommendationItems = homeItems,
+        itemKey = { it.title + it.browseId + it.videoId }
+    ) { homeItem ->
+        YtMusicHomeItemCard(
+            item = homeItem,
+            isFavorite = homeItem.toPlaylist()
+                ?.favoriteId()
+                ?.let { favoriteKeys.contains("youtubeMusic:$it") } == true,
+            onClick = { onHomeItemClick(homeItem) },
+            onShowSnackbar = onShowSnackbar
+        )
+    }
+}
+
+@Composable
+private fun <T> RecommendationScroller(
+    recommendationItems: List<T>,
+    itemKey: (T) -> String,
+    itemContent: @Composable (T) -> Unit
+) {
+    val rowsPerColumn = if (recommendationItems.size >= 10) 2 else 1
+    val columns = remember(recommendationItems, rowsPerColumn) {
+        recommendationItems.chunked(rowsPerColumn)
+    }
+
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(
+            items = columns,
+            key = { column -> column.joinToString(":", transform = itemKey) }
+        ) { column ->
+            Column(
+                modifier = Modifier.width(150.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                column.forEach { item ->
+                    itemContent(item)
+                }
+            }
         }
     }
 }
@@ -1105,6 +1226,18 @@ private fun LazyGridScope.addYouTubeMusicSongShelfSection(
             onSongClick = onSongClick
         )
     }
+}
+
+@Composable
+private fun RecentPlaysSection(
+    songs: List<SongItem>,
+    onSongClick: (List<SongItem>, Int) -> Unit
+) {
+    val previewSongs = remember(songs) { songs.take(12) }
+    ResponsiveSongPagerList(
+        songs = previewSongs,
+        onSongClick = { _, index -> onSongClick(songs, index) }
+    )
 }
 
 @Composable

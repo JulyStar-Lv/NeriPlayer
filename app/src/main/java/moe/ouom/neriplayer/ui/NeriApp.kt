@@ -586,6 +586,7 @@ private fun NeriAppContent(
     val defaultStartDestination by repo.defaultStartDestinationFlow.collectAsState(initial = Destinations.Home.route)
     val autoShowKeyboard by repo.autoShowKeyboardFlow.collectAsState(initial = false)
     val showHomeContinueCard by repo.homeCardContinueFlow.collectAsState(initial = true)
+    val showHomeRecentCard by repo.homeCardRecentFlow.collectAsState(initial = true)
     val showHomeTrendingCard by repo.homeCardTrendingFlow.collectAsState(initial = true)
     val showHomeRadarCard by repo.homeCardRadarFlow.collectAsState(initial = true)
     val showHomeRecommendedCard by repo.homeCardRecommendedFlow.collectAsState(initial = true)
@@ -603,6 +604,7 @@ private fun NeriAppContent(
         initial = startupPlaybackPreferences.maxCacheSizeBytes
     )
     val homeUsageEntries by AppContainer.playlistUsageRepo.frequentPlaylistsFlow.collectAsState(initial = emptyList())
+    val homeRecentPlays by AppContainer.playHistoryRepo.historyFlow.collectAsState(initial = emptyList())
     var pendingFollowSystemDark by remember { mutableStateOf<Boolean?>(null) }
     var pendingForceDark by remember { mutableStateOf<Boolean?>(null) }
     var themeRevealSnapshot by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -982,6 +984,7 @@ private fun NeriAppContent(
             val currentRoute = backEntry?.destination?.route
             val showHomeTab =
                 (showHomeContinueCard && homeUsageEntries.isNotEmpty()) ||
+                    (showHomeRecentCard && homeRecentPlays.isNotEmpty()) ||
                     showHomeTrendingCard ||
                     showHomeRadarCard ||
                     showHomeRecommendedCard
@@ -1185,9 +1188,11 @@ private fun NeriAppContent(
                                 ) {
                                     HomeHostScreen(
                                         showContinueCard = showHomeContinueCard,
+                                        showRecentCard = showHomeRecentCard,
                                         showTrendingCard = showHomeTrendingCard,
                                         showRadarCard = showHomeRadarCard,
                                         showRecommendedCard = showHomeRecommendedCard,
+                                        onOpenRecentScreen = { navController.navigate(Destinations.Recent.route) },
                                         onSongClick = ::playSongsAndOpenNowPlaying
                                     )
                                 }
@@ -1342,8 +1347,7 @@ private fun NeriAppContent(
                                 ) {
                                     LibraryHostScreen(
                                         onSongClick = ::playSongsAndOpenNowPlaying,
-                                        onPlayParts = ::playBiliPartsAndOpenNowPlaying,
-                                        onOpenRecent = { navController.navigate(Destinations.Recent.route) }
+                                        onPlayParts = ::playBiliPartsAndOpenNowPlaying
                                     )
                                 }
 
@@ -1620,6 +1624,10 @@ private fun NeriAppContent(
                                         onShowHomeContinueCardChange = { enabled ->
                                             scope.launch { repo.setHomeCardContinue(enabled) }
                                         },
+                                        showHomeRecentCard = showHomeRecentCard,
+                                        onShowHomeRecentCardChange = { enabled ->
+                                            scope.launch { repo.setHomeCardRecent(enabled) }
+                                        },
                                         showHomeTrendingCard = showHomeTrendingCard,
                                         onShowHomeTrendingCardChange = { enabled ->
                                             scope.launch { repo.setHomeCardTrending(enabled) }
@@ -1633,6 +1641,7 @@ private fun NeriAppContent(
                                             scope.launch { repo.setHomeCardRecommended(enabled) }
                                         },
                                         homeHasRecentUsage = homeUsageEntries.isNotEmpty(),
+                                        homeHasRecentPlays = homeRecentPlays.isNotEmpty(),
                                         playbackFadeIn = playbackFadeIn,
                                         onPlaybackFadeInChange = { enabled ->
                                             scope.launch { repo.setPlaybackFadeIn(enabled) }

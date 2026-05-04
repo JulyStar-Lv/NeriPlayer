@@ -1364,12 +1364,22 @@
     <string name="library_youtube_music_open_playlist">Open Playlist</string>
     <string name="library_youtube_music_copy_browse_id">Copy Browse ID</string>
     <string name="library_youtube_music_copy_playlist_id">Copy Playlist ID</string>
+    <string name="library_platform_accounts">Platform Accounts</string>
+    <string name="library_platform_accounts_desc">Connect platforms and the library will load playlists, favorites, and albums automatically</string>
+    <string name="library_platform_login">Sign in</string>
+    <string name="library_platform_manage">Manage</string>
+    <string name="library_platform_refresh_login">Refresh</string>
+    <string name="library_platform_connect_platform">Connect %1$s</string>
+    <string name="library_platform_empty_netease_playlist">Sign in to load your NetEase playlists</string>
+    <string name="library_platform_empty_netease_album">Sign in to load your saved NetEase albums</string>
+    <string name="library_platform_empty_bilibili">Sign in to load your Bilibili favorite folders</string>
+    <string name="library_platform_empty_youtube">Sign in to load your YouTube Music playlists</string>
+    <string name="library_platform_qqmusic_auth_hint">QQ Music library and sign-in are still in development</string>
     <string name="library_favorite_source_format" formatted="false">%d songs · %s</string>
     <string name="library_favorite_sort_mode_title">Favorite Playlist Order</string>
     <string name="library_favorite_sort_mode_desc">Long press a playlist to enter sorting mode, then drag the handle</string>
     <string name="library_title">Library</string>
     <string name="library_coming_soon">Coming Soon</string>
-    <string name="library_recent_played">Recent Plays</string>
     <string name="nowplaying_youtube_music">YouTube</string>
     <string name="library_delete_playlist_confirm">Delete playlist \"%1$s\"?</string>
 
