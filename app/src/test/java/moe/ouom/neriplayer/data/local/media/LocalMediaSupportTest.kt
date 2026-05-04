@@ -152,4 +152,13 @@ class LocalMediaSupportTest {
         assertEquals(false, selection.usesFallbackAlbum)
         assertEquals(0L, selection.durationMs)
     }
+
+    @Test
+    fun `readFirstLyricValue accepts suffixed unsynced lyric tags`() {
+        val lyric = mapOf(
+            "UNSYNCEDLYRICS:eng:description" to arrayOf("line one\nline two")
+        ).readFirstLyricValue()
+
+        assertEquals("line one\nline two", lyric)
+    }
 }

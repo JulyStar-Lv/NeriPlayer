@@ -1053,11 +1053,7 @@ object LocalMediaSupport {
                 bitrateKbps = audioProperties?.bitrate?.takeIf { it > 0 },
                 sampleRateHz = audioProperties?.sampleRate?.takeIf { it > 0 },
                 channelCount = audioProperties?.channels?.takeIf { it > 0 },
-                lyrics = propertyMap.readFirstValue(
-                    "LYRICS",
-                    "UNSYNCEDLYRICS",
-                    "DESCRIPTION"
-                ),
+                lyrics = propertyMap.readFirstLyricValue(),
                 coverBytes = coverBytes?.takeIf { it.isNotEmpty() }
             )
         }
@@ -1511,6 +1507,40 @@ private fun Map<String, Array<String>>?.readFirstValue(vararg keys: String): Str
             ?.trim(NUL_CHAR, ' ')
             ?.takeIf { it.isNotBlank() }
     }
+}
+
+internal fun Map<String, Array<String>>?.readFirstLyricValue(): String? {
+    val propertyMap = this ?: return null
+    return propertyMap.readFirstValue(
+        "LYRICS",
+        "UNSYNCEDLYRICS",
+        "UNSYNCED LYRICS",
+        "UNSYNCED_LYRICS",
+        "USLT",
+        "DESCRIPTION"
+    ) ?: propertyMap.entries.firstNotNullOfOrNull { (entryKey, values) ->
+        values.firstReadableTagValue()?.takeIf { entryKey.isLikelyLyricTagKey() }
+    }
+}
+
+private fun Array<String>.firstReadableTagValue(): String? {
+    return firstOrNull()
+        ?.replace(BOM_CHAR.toString(), "")
+        ?.trim(NUL_CHAR, ' ')
+        ?.takeIf { it.isNotBlank() }
+}
+
+private fun String.isLikelyLyricTagKey(): Boolean {
+    val compactKey = filter(Char::isLetterOrDigit).uppercase()
+    if (compactKey.contains("TRANSLATED")) {
+        return false
+    }
+    return compactKey == "LYRICS" ||
+        compactKey.startsWith("LYRICS") ||
+        compactKey == "UNSYNCEDLYRICS" ||
+        compactKey.startsWith("UNSYNCEDLYRICS") ||
+        compactKey == "USLT" ||
+        compactKey.startsWith("USLT")
 }
 
 private fun RandomAccessFile.readFourCc(): String? {

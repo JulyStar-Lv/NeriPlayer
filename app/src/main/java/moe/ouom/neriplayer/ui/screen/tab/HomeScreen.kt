@@ -55,6 +55,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Bolt
@@ -152,6 +153,8 @@ fun HomeScreen(
     gridState: LazyGridState,
     onOpenRecent: (UsageEntry) -> Unit = {},
     onOpenRecentScreen: () -> Unit = {},
+    onOpenSongSection: (String, List<SongItem>) -> Unit = { _, _ -> },
+    onOpenPlaylistSection: (String, List<HomePlaylistGridItem>) -> Unit = { _, _ -> },
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
@@ -197,9 +200,23 @@ fun HomeScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val configuration = LocalConfiguration.current
+    val recentTitle = stringResource(R.string.recent_title)
+    val continueTitle = stringResource(R.string.player_continue)
+    val trendingTitle = stringResource(R.string.recommend_trending)
+    val radarTitle = stringResource(R.string.recommend_radar)
+    val recommendedTitle = stringResource(R.string.recommend_for_you)
     val guessYouLikeTitle = stringResource(R.string.home_ytmusic_guess_you_like)
     val dailyDiscoverTitle = stringResource(R.string.home_ytmusic_daily_discover)
     val moreRecommendationsTitle = stringResource(R.string.home_ytmusic_more_recommendations)
+    val continuePlaylistItems = remember(usage, context, configuration) {
+        usage.map { entry ->
+            val displayName = SystemLocalPlaylists.resolve(entry.id, entry.name, context)
+                ?.currentName
+                ?: entry.name
+            entry.toHomePlaylistGridItem(displayName)
+        }
+    }
     val ytmSections = remember(ui.ytMusicHomeShelves.items) {
         classifyYouTubeMusicShelves(ui.ytMusicHomeShelves.items)
     }
@@ -295,9 +312,10 @@ fun HomeScreen(
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             SectionHeader(
                                 icon = Icons.Outlined.History,
-                                title = stringResource(R.string.recent_title),
-                                actionLabel = stringResource(R.string.common_all),
-                                onActionClick = onOpenRecentScreen
+                                title = recentTitle,
+                                onHeaderClick = {
+                                    onOpenSongSection(recentTitle, recentSongs)
+                                }
                             )
                         }
                         item(span = { GridItemSpan(maxLineSpan) }) {
@@ -312,7 +330,10 @@ fun HomeScreen(
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             SectionHeader(
                                 icon = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                                title = stringResource(R.string.player_continue)
+                                title = continueTitle,
+                                onHeaderClick = {
+                                    onOpenPlaylistSection(continueTitle, continuePlaylistItems)
+                                }
                             )
                         }
                         item(span = { GridItemSpan(maxLineSpan) }) {
@@ -329,6 +350,7 @@ fun HomeScreen(
                                 shelf = ytmSections.guessYouLike,
                                 icon = Icons.Outlined.Bolt,
                                 title = guessYouLikeTitle,
+                                onOpenSongSection = onOpenSongSection,
                                 onSongClick = onSongClick
                             )
                         }
@@ -338,6 +360,7 @@ fun HomeScreen(
                                 shelf = ytmSections.dailyDiscover,
                                 icon = Icons.Outlined.Explore,
                                 title = dailyDiscoverTitle,
+                                onOpenSongSection = onOpenSongSection,
                                 onSongClick = onSongClick
                             )
                         }
@@ -346,7 +369,17 @@ fun HomeScreen(
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 SectionHeader(
                                     icon = Icons.Outlined.Star,
-                                    title = moreRecommendationsTitle
+                                    title = moreRecommendationsTitle,
+                                    onHeaderClick = ui.ytMusicPlaylists.items
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.let { playlists ->
+                                            {
+                                                onOpenPlaylistSection(
+                                                    moreRecommendationsTitle,
+                                                    playlists.map { it.toHomePlaylistGridItem() }
+                                                )
+                                            }
+                                        }
                                 )
                             }
 
@@ -385,6 +418,7 @@ fun HomeScreen(
                                                 shelf = shelf,
                                                 icon = Icons.Outlined.Explore,
                                                 title = shelf.title,
+                                                onOpenSongSection = onOpenSongSection,
                                                 onSongClick = onSongClick
                                             )
                                         } else {
@@ -395,7 +429,15 @@ fun HomeScreen(
                                             item(span = { GridItemSpan(maxLineSpan) }) {
                                                 SectionHeader(
                                                     icon = Icons.Outlined.Explore,
-                                                    title = shelf.title
+                                                    title = shelf.title,
+                                                    onHeaderClick = {
+                                                        onOpenPlaylistSection(
+                                                            shelf.title,
+                                                            playlistItems.mapNotNull {
+                                                                it.toPlaylist()?.toHomePlaylistGridItem()
+                                                            }
+                                                        )
+                                                    }
                                                 )
                                             }
                                             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -455,7 +497,12 @@ fun HomeScreen(
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 SectionHeader(
                                     icon = Icons.Outlined.Bolt,
-                                    title = stringResource(R.string.recommend_trending)
+                                    title = trendingTitle,
+                                    onHeaderClick = ui.hotSongs.items
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.let { songs ->
+                                            { onOpenSongSection(trendingTitle, songs) }
+                                        }
                                 )
                             }
                             sectionContent(
@@ -476,7 +523,12 @@ fun HomeScreen(
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 SectionHeader(
                                     icon = Icons.Outlined.Radar,
-                                    title = stringResource(R.string.recommend_radar)
+                                    title = radarTitle,
+                                    onHeaderClick = ui.radarSongs.items
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.let { songs ->
+                                            { onOpenSongSection(radarTitle, songs) }
+                                        }
                                 )
                             }
                             sectionContent(
@@ -497,7 +549,17 @@ fun HomeScreen(
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 SectionHeader(
                                     icon = Icons.Outlined.Star,
-                                    title = stringResource(R.string.recommend_for_you)
+                                    title = recommendedTitle,
+                                    onHeaderClick = ui.playlists.items
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.let { playlists ->
+                                            {
+                                                onOpenPlaylistSection(
+                                                    recommendedTitle,
+                                                    playlists.map { it.toHomePlaylistGridItem() }
+                                                )
+                                            }
+                                        }
                                 )
                             }
                             when {
@@ -568,28 +630,51 @@ private fun SectionHeader(
     icon: ImageVector,
     title: String,
     actionLabel: String? = null,
-    onActionClick: (() -> Unit)? = null
+    onActionClick: (() -> Unit)? = null,
+    onHeaderClick: (() -> Unit)? = null
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+    val rowModifier = if (onHeaderClick != null) {
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onHeaderClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    } else {
+        Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp)
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = rowModifier
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .padding(start = 8.dp)
                 .weight(1f)
-        )
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (onHeaderClick != null) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.common_all),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
         if (actionLabel != null && onActionClick != null) {
             TextButton(onClick = onActionClick) {
                 Text(actionLabel)
@@ -1208,6 +1293,7 @@ private fun LazyGridScope.addYouTubeMusicSongShelfSection(
     shelf: YouTubeMusicHomeShelf,
     icon: ImageVector,
     title: String,
+    onOpenSongSection: (String, List<SongItem>) -> Unit,
     onSongClick: (List<SongItem>, Int) -> Unit
 ) {
     val songs = shelf.items.mapNotNull { it.toPlayableSongItem(shelf.title) }
@@ -1217,7 +1303,10 @@ private fun LazyGridScope.addYouTubeMusicSongShelfSection(
     item(span = { GridItemSpan(maxLineSpan) }) {
         SectionHeader(
             icon = icon,
-            title = title
+            title = title,
+            onHeaderClick = {
+                onOpenSongSection(title, songs)
+            }
         )
     }
     item(span = { GridItemSpan(maxLineSpan) }) {

@@ -66,6 +66,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -338,6 +339,8 @@ class MainActivity : ComponentActivity() {
                             // 弹窗状态管理和事件监听
                             var showDialog by remember { mutableStateOf(false) }
                             var dialogMessage by remember { mutableStateOf("") }
+                            var dialogSuppressibleHint by remember { mutableStateOf<PlayerEvent.SuppressibleHint?>(null) }
+                            var rememberNoRemind by rememberSaveable { mutableStateOf(false) }
                             var showErrorDialog by remember { mutableStateOf(false) }
                             var errorTitle by remember { mutableStateOf("") }
                             var errorMessage by remember { mutableStateOf("") }
@@ -348,6 +351,9 @@ class MainActivity : ComponentActivity() {
                             val listenTogetherStatus by listenTogetherStatusFlow.collectAsState()
                             val listenTogetherSessionState by AppContainer.listenTogetherSessionManager.sessionState.collectAsState()
                             val listenTogetherRoomState by AppContainer.listenTogetherSessionManager.roomState.collectAsState()
+                            val suppressNeteaseNoPermissionHint by settingsRepository
+                                .suppressNeteaseNoPermissionHintFlow
+                                .collectAsState(initial = false)
                             val isListenTogetherRoomActive = !listenTogetherSessionState.roomId.isNullOrBlank()
                             var hadActiveListenTogetherRoom by rememberSaveable { mutableStateOf(false) }
                             var lastShownListenTogetherNotice by rememberSaveable { mutableStateOf<String?>(null) }
@@ -362,6 +368,21 @@ class MainActivity : ComponentActivity() {
                             }
                             val showLeaveListenTogetherAction = isListenTogetherRoomActive &&
                                 shouldOfferListenTogetherLeaveAction(dialogMessage)
+
+                            fun dismissPlayerDialog(rememberSuppression: Boolean = false) {
+                                val hintToSuppress = dialogSuppressibleHint
+                                if (rememberSuppression && rememberNoRemind && hintToSuppress != null) {
+                                    scope.launch {
+                                        when (hintToSuppress) {
+                                            PlayerEvent.SuppressibleHint.NETEASE_NO_PERMISSION ->
+                                                settingsRepository.setSuppressNeteaseNoPermissionHint(true)
+                                        }
+                                    }
+                                }
+                                showDialog = false
+                                rememberNoRemind = false
+                                dialogSuppressibleHint = null
+                            }
 
                             // 初始化异常处理器事件监听
                             LaunchedEffect(Unit) {
@@ -402,17 +423,27 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            LaunchedEffect(lifecycleOwner.lifecycle) {
+                            LaunchedEffect(lifecycleOwner.lifecycle, suppressNeteaseNoPermissionHint) {
                                 lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                                     PlayerManager.playerEventFlow.collect { event ->
                                         when (event) {
                                             is PlayerEvent.ShowLoginPrompt -> {
                                                 dialogMessage = event.message
+                                                dialogSuppressibleHint = null
+                                                rememberNoRemind = false
                                                 showDialog = true
                                             }
 
                                             is PlayerEvent.ShowError -> {
+                                                if (
+                                                    event.suppressibleHint == PlayerEvent.SuppressibleHint.NETEASE_NO_PERMISSION &&
+                                                    suppressNeteaseNoPermissionHint
+                                                ) {
+                                                    return@collect
+                                                }
                                                 dialogMessage = event.message
+                                                dialogSuppressibleHint = event.suppressibleHint
+                                                rememberNoRemind = false
                                                 showDialog = true
                                             }
                                         }
@@ -470,11 +501,27 @@ class MainActivity : ComponentActivity() {
 
                             if (showDialog) {
                                 AlertDialog(
-                                    onDismissRequest = { showDialog = false },
+                                    onDismissRequest = { dismissPlayerDialog() },
                                     title = { Text(stringResource(R.string.dialog_hint)) },
-                                    text = { Text(dialogMessage) },
+                                    text = {
+                                        Column {
+                                            Text(dialogMessage)
+                                            if (dialogSuppressibleHint != null) {
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Checkbox(
+                                                        checked = rememberNoRemind,
+                                                        onCheckedChange = { rememberNoRemind = it }
+                                                    )
+                                                    Text(stringResource(R.string.dialog_remember_no_remind))
+                                                }
+                                            }
+                                        }
+                                    },
                                     confirmButton = {
-                                        HapticTextButton(onClick = { showDialog = false }) {
+                                        HapticTextButton(onClick = { dismissPlayerDialog(rememberSuppression = true) }) {
                                             Text(stringResource(R.string.action_confirm))
                                         }
                                     },
@@ -483,7 +530,7 @@ class MainActivity : ComponentActivity() {
                                             HapticTextButton(
                                                 onClick = {
                                                     AppContainer.listenTogetherSessionManager.leaveRoom()
-                                                    showDialog = false
+                                                    dismissPlayerDialog()
                                                 }
                                             ) {
                                                 Text(stringResource(R.string.listen_together_leave_room))

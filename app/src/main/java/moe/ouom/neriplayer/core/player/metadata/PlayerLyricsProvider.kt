@@ -32,6 +32,8 @@ import moe.ouom.neriplayer.core.api.netease.NeteaseClient
 import moe.ouom.neriplayer.core.api.search.MusicPlatform
 import moe.ouom.neriplayer.core.api.youtube.YouTubeMusicClient
 import moe.ouom.neriplayer.core.player.AudioDownloadManager
+import moe.ouom.neriplayer.data.local.media.LocalMediaSupport
+import moe.ouom.neriplayer.data.local.media.isLocalSong
 import moe.ouom.neriplayer.data.platform.youtube.extractYouTubeMusicVideoId
 import moe.ouom.neriplayer.data.platform.youtube.isYouTubeMusicSong
 import moe.ouom.neriplayer.ui.component.LyricEntry
@@ -143,6 +145,7 @@ internal object PlayerLyricsProvider {
 
     private fun parseLocalLyricOverride(
         rawLyric: String?,
+        durationMs: Long,
         logPrefix: String
     ): List<LyricEntry>? {
         return when (resolveLocalLyricOverrideState(rawLyric)) {
@@ -150,12 +153,27 @@ internal object PlayerLyricsProvider {
             LocalLyricOverrideState.CLEARED -> emptyList()
             LocalLyricOverrideState.PRESENT -> {
                 try {
-                    parseBestLyricEntries(rawLyric!!)
+                    parseLyricsWithPlainTextFallback(rawLyric!!, durationMs)
                 } catch (error: Exception) {
                     NPLogger.w("NERI-PlayerManager", "$logPrefix: ${error.message}")
                     null
                 }
             }
+        }
+    }
+
+    private fun readInspectableLocalLyricContent(
+        application: Application,
+        song: SongItem
+    ): String? {
+        if (!song.isLocalSong()) {
+            return null
+        }
+        return runCatching {
+            LocalMediaSupport.inspect(application, song)?.lyricContent
+        }.getOrElse { error ->
+            NPLogger.w("NERI-PlayerManager", "本地文件歌词读取失败: ${error.message}")
+            null
         }
     }
 
@@ -228,10 +246,12 @@ internal object PlayerLyricsProvider {
                     currentLyric = song.matchedTranslatedLyric,
                     legacyLyric = song.originalTranslatedLyric
                 ),
+                durationMs = song.durationMs,
                 logPrefix = "本地翻译歌词解析失败"
             )?.let { return@withContext it }
             parseLocalLyricOverride(
                 rawLyric = AudioDownloadManager.getTranslatedLyricContent(application, song),
+                durationMs = song.durationMs,
                 logPrefix = "本地翻译歌词读取失败"
             )?.let { return@withContext it }
 
@@ -285,11 +305,18 @@ internal object PlayerLyricsProvider {
                     currentLyric = song.matchedLyric,
                     legacyLyric = song.originalLyric
                 ),
+                durationMs = song.durationMs,
                 logPrefix = "匹配歌词解析失败"
             )?.let { return@withContext it }
             parseLocalLyricOverride(
                 rawLyric = AudioDownloadManager.getLyricContent(application, song),
+                durationMs = song.durationMs,
                 logPrefix = "本地歌词读取失败"
+            )?.let { return@withContext it }
+            parseLocalLyricOverride(
+                rawLyric = readInspectableLocalLyricContent(application, song),
+                durationMs = song.durationMs,
+                logPrefix = "本地内嵌歌词解析失败"
             )?.let { return@withContext it }
 
             if (isYouTubeMusicSong(song)) {

@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -53,7 +54,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MoreVert
@@ -69,13 +71,11 @@ import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -146,7 +146,7 @@ enum class LibraryTab(val labelResId: Int) {
     LOCAL(R.string.library_tab_local),
     FAVORITE(R.string.library_tab_favorite),
     YTMUSIC(R.string.library_tab_youtube_music),
-    NETEASE(R.string.library_tab_netease_playlist),
+    NETEASE(R.string.platform_netease_short),
     NETEASEALBUM(R.string.library_tab_netease_album),
     BILI(R.string.library_tab_bilibili),
     QQMUSIC(R.string.library_tab_qqmusic)
@@ -183,19 +183,15 @@ private fun libraryTabDisplayOrder(isInternational: Boolean): List<LibraryTab> {
             LibraryTab.FAVORITE,
             LibraryTab.YTMUSIC,
             LibraryTab.NETEASE,
-            LibraryTab.NETEASEALBUM,
-            LibraryTab.BILI,
-            LibraryTab.QQMUSIC
+            LibraryTab.BILI
         )
     } else {
         listOf(
             LibraryTab.LOCAL,
             LibraryTab.FAVORITE,
             LibraryTab.NETEASE,
-            LibraryTab.NETEASEALBUM,
             LibraryTab.YTMUSIC,
-            LibraryTab.BILI,
-            LibraryTab.QQMUSIC
+            LibraryTab.BILI
         )
     }
 }
@@ -207,7 +203,6 @@ fun LibraryScreen(
     onTabChange: (LibraryTab) -> Unit = {},
     localListState: LazyListState,
     favoriteListState: LazyListState,
-    neteaseAlbumState: LazyListState,
     neteaseListState: LazyListState,
     youtubeMusicListState: LazyListState,
     biliListState: LazyListState,
@@ -241,7 +236,7 @@ fun LibraryScreen(
         pageCount = { orderedTabs.size }
     )
     val scope = rememberCoroutineScope()
-    var showPlatformAccountSheet by rememberSaveable { mutableStateOf(false) }
+    var showPlatformAccountPage by rememberSaveable { mutableStateOf(false) }
     var inlineMsg by remember { mutableStateOf<String?>(null) }
     var showNeteaseSheet by remember { mutableStateOf(false) }
     var showNeteaseSavedCookieDialog by remember { mutableStateOf(false) }
@@ -407,9 +402,6 @@ fun LibraryScreen(
         missingResId = R.string.settings_netease_status_missing,
         emptyHint = stringResource(R.string.library_platform_empty_netease_playlist)
     )
-    val neteaseAlbumAuth = neteasePlaylistAuth.copy(
-        emptyHint = stringResource(R.string.library_platform_empty_netease_album)
-    )
     val biliAuth = savedCookiePlatformAuthUiState(
         platform = LibraryAuthPlatform.BILI,
         title = stringResource(R.string.platform_bilibili),
@@ -428,16 +420,7 @@ fun LibraryScreen(
         savedAt = youtubeAuthUiState.health.savedAt,
         hasSavedAuth = youtubeAuthUiState.hasSavedAuth
     )
-    val qqMusicAuth = PlatformAuthUiState(
-        platform = LibraryAuthPlatform.QQMUSIC,
-        title = stringResource(R.string.settings_qq_music),
-        iconResId = R.drawable.ic_qq_music,
-        connectionState = PlatformConnectionState.ComingSoon,
-        statusText = stringResource(R.string.common_coming_soon),
-        emptyHint = stringResource(R.string.library_platform_qqmusic_auth_hint),
-        actionLabel = stringResource(R.string.common_coming_soon)
-    )
-    val platformAuthStates = listOf(neteasePlaylistAuth, youtubeAuth, biliAuth, qqMusicAuth)
+    val platformAuthStates = listOf(neteasePlaylistAuth, youtubeAuth, biliAuth)
     val hasConnectedPlatform = platformAuthStates.any {
         it.connectionState == PlatformConnectionState.Connected
     }
@@ -451,7 +434,6 @@ fun LibraryScreen(
     }
 
     fun handlePlatformAuthAction(platform: LibraryAuthPlatform) {
-        showPlatformAccountSheet = false
         when (platform) {
             LibraryAuthPlatform.NETEASE -> openNeteaseAuth()
             LibraryAuthPlatform.YOUTUBE -> openYouTubeAuth()
@@ -460,143 +442,142 @@ fun LibraryScreen(
         }
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
-    ) {
-        LargeTopAppBar(
-            title = { Text(stringResource(R.string.library_title)) },
-            scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = Color.Transparent
-            ),
-            actions = {
-                HapticIconButton(onClick = { showPlatformAccountSheet = true }) {
-                    Icon(
-                        Icons.Filled.AccountCircle,
-                        contentDescription = stringResource(R.string.library_platform_accounts),
-                        tint = accountIconTint
-                    )
-                }
-            }
-        )
+    BackHandler(enabled = showPlatformAccountPage) {
+        showPlatformAccountPage = false
+    }
 
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f)
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            modifier = Modifier
-                .padding(horizontal = 0.dp, vertical = 12.dp)
+    if (showPlatformAccountPage) {
+        PlatformAccountPage(
+            platforms = platformAuthStates,
+            onNavigateUp = { showPlatformAccountPage = false },
+            onPlatformAction = ::handlePlatformAuthAction
+        )
+    } else {
+        Column(
+            Modifier
                 .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
         ) {
-            Column(Modifier.fillMaxSize()) {
-                PrimaryScrollableTabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    edgePadding = 8.dp,
+            LargeTopAppBar(
+                title = { Text(stringResource(R.string.library_title)) },
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    orderedTabs.forEachIndexed { index, tab ->
-                        Tab(
-                            selected = pagerState.currentPage == index,
-                            onClick = {
-                                scope.launch {
-                                    pagerState.animateScrollToPage(index)
-                                }
-                            },
-                            selectedContentColor = MaterialTheme.colorScheme.primary,
-                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            text = { Text(stringResource(tab.labelResId)) }
+                    scrolledContainerColor = Color.Transparent
+                ),
+                actions = {
+                    HapticIconButton(onClick = { showPlatformAccountPage = true }) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.library_platform_accounts),
+                            tint = accountIconTint
                         )
                     }
                 }
+            )
 
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
-                    pageSpacing = 0.dp
-                ) { page ->
-                    when (orderedTabs[page]) {
-                        LibraryTab.LOCAL -> LocalPlaylistList(
-                            playlists = ui.localPlaylists,
-                            listState = localListState,
-                            onCreate = { name ->
-                                val finalName = name.trim().ifBlank { defaultPlaylistName }
-                                vm.createLocalPlaylist(finalName)
-                            },
-                            onClick = onLocalPlaylistClick,
-                            onRename = { playlistId, newName ->
-                                vm.renameLocalPlaylist(playlistId, newName)
-                            },
-                            onDelete = { playlistId ->
-                                vm.deleteLocalPlaylist(playlistId)
-                            },
-                            onReorder = { order ->
-                                vm.reorderLocalPlaylists(order)
-                            }
-                        )
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                modifier = Modifier
+                    .padding(horizontal = 0.dp, vertical = 12.dp)
+                    .fillMaxSize()
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    PrimaryScrollableTabRow(
+                        selectedTabIndex = pagerState.currentPage,
+                        edgePadding = 8.dp,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        orderedTabs.forEachIndexed { index, tab ->
+                            Tab(
+                                selected = pagerState.currentPage == index,
+                                onClick = {
+                                    scope.launch {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                },
+                                selectedContentColor = MaterialTheme.colorScheme.primary,
+                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = { Text(stringResource(tab.labelResId)) }
+                            )
+                        }
+                    }
 
-                        LibraryTab.FAVORITE -> FavoritePlaylistList(
-                            listState = favoriteListState,
-                            onNeteasePlaylistClick = onNeteasePlaylistClick,
-                            onNeteaseAlbumClick = onNeteaseAlbumClick,
-                            onBiliPlaylistClick = onBiliPlaylistClick,
-                            onYouTubeMusicPlaylistClick = onYouTubeMusicPlaylistClick
-                        )
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        pageSpacing = 0.dp
+                    ) { page ->
+                        when (orderedTabs[page]) {
+                            LibraryTab.LOCAL -> LocalPlaylistList(
+                                playlists = ui.localPlaylists,
+                                listState = localListState,
+                                onCreate = { name ->
+                                    val finalName = name.trim().ifBlank { defaultPlaylistName }
+                                    vm.createLocalPlaylist(finalName)
+                                },
+                                onClick = onLocalPlaylistClick,
+                                onRename = { playlistId, newName ->
+                                    vm.renameLocalPlaylist(playlistId, newName)
+                                },
+                                onDelete = { playlistId ->
+                                    vm.deleteLocalPlaylist(playlistId)
+                                },
+                                onReorder = { order ->
+                                    vm.reorderLocalPlaylists(order)
+                                }
+                            )
 
-                        LibraryTab.NETEASE -> NeteasePlaylistList(
-                            playlists = ui.neteasePlaylists,
-                            listState = neteaseListState,
-                            authUiState = neteasePlaylistAuth,
-                            onClick = onNeteasePlaylistClick,
-                            onAuthAction = { openNeteaseAuth() }
-                        )
+                            LibraryTab.FAVORITE -> FavoritePlaylistList(
+                                listState = favoriteListState,
+                                onNeteasePlaylistClick = onNeteasePlaylistClick,
+                                onNeteaseAlbumClick = onNeteaseAlbumClick,
+                                onBiliPlaylistClick = onBiliPlaylistClick,
+                                onYouTubeMusicPlaylistClick = onYouTubeMusicPlaylistClick
+                            )
 
-                        LibraryTab.NETEASEALBUM -> NeteaseAlbumList(
-                            playlists = ui.neteaseAlbums,
-                            listState = neteaseAlbumState,
-                            authUiState = neteaseAlbumAuth,
-                            onClick = onNeteaseAlbumClick,
-                            onAuthAction = { openNeteaseAuth() }
-                        )
+                            LibraryTab.NETEASE,
+                            LibraryTab.NETEASEALBUM -> NeteaseLibraryList(
+                                playlists = ui.neteasePlaylists,
+                                albums = ui.neteaseAlbums,
+                                listState = neteaseListState,
+                                authUiState = neteasePlaylistAuth,
+                                onPlaylistClick = onNeteasePlaylistClick,
+                                onAlbumClick = onNeteaseAlbumClick,
+                                onAuthAction = { openNeteaseAuth() }
+                            )
 
-                        LibraryTab.YTMUSIC -> YouTubeMusicPlaylistList(
-                            playlists = ui.youtubeMusicPlaylists,
-                            error = ui.youtubeMusicError,
-                            listState = youtubeMusicListState,
-                            authUiState = youtubeAuth,
-                            onClick = onYouTubeMusicPlaylistClick,
-                            onAuthAction = { openYouTubeAuth() },
-                            onRetry = { vm.refreshYouTubeMusicPlaylists() }
-                        )
+                            LibraryTab.YTMUSIC -> YouTubeMusicPlaylistList(
+                                playlists = ui.youtubeMusicPlaylists,
+                                error = ui.youtubeMusicError,
+                                listState = youtubeMusicListState,
+                                authUiState = youtubeAuth,
+                                onClick = onYouTubeMusicPlaylistClick,
+                                onAuthAction = { openYouTubeAuth() },
+                                onRetry = { vm.refreshYouTubeMusicPlaylists() }
+                            )
 
-                        LibraryTab.BILI -> BiliPlaylistList(
-                            playlists = ui.biliPlaylists,
-                            listState = biliListState,
-                            authUiState = biliAuth,
-                            onClick = onBiliPlaylistClick,
-                            onAuthAction = { openBiliAuth() }
-                        )
+                            LibraryTab.BILI -> BiliPlaylistList(
+                                playlists = ui.biliPlaylists,
+                                listState = biliListState,
+                                authUiState = biliAuth,
+                                onClick = onBiliPlaylistClick,
+                                onAuthAction = { openBiliAuth() }
+                            )
 
-                        LibraryTab.QQMUSIC -> QqMusicPlaylistList(
-                            listState = qqMusicListState
-                        )
+                            LibraryTab.QQMUSIC -> QqMusicPlaylistList(
+                                listState = qqMusicListState
+                            )
+                        }
                     }
                 }
             }
         }
-    }
-
-    if (showPlatformAccountSheet) {
-        PlatformAccountSheet(
-            platforms = platformAuthStates,
-            onDismiss = { showPlatformAccountSheet = false },
-            onPlatformAction = ::handlePlatformAuthAction
-        )
     }
 
     SettingsNeteaseAuthDialogs(
@@ -758,38 +739,60 @@ private fun platformActionLabel(connectionState: PlatformConnectionState): Strin
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PlatformAccountSheet(
+@OptIn(ExperimentalMaterial3Api::class)
+private fun PlatformAccountPage(
     platforms: List<PlatformAuthUiState>,
-    onDismiss: () -> Unit,
+    onNavigateUp: () -> Unit,
     onPlatformAction: (LibraryAuthPlatform) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val miniPlayerHeight = LocalMiniPlayerHeight.current
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+    Column(
+        Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 36.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.library_platform_accounts),
-                style = MaterialTheme.typography.titleLarge
+        LargeTopAppBar(
+            title = { Text(stringResource(R.string.library_platform_accounts)) },
+            navigationIcon = {
+                HapticIconButton(onClick = onNavigateUp) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = stringResource(R.string.action_back)
+                    )
+                }
+            },
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.library_platform_accounts_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+        )
 
-            platforms.forEach { platform ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 4.dp,
+                bottom = 24.dp + miniPlayerHeight
+            )
+        ) {
+            item {
+                Text(
+                    text = stringResource(R.string.library_platform_accounts_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 12.dp)
+                )
+            }
+
+            items(
+                items = platforms,
+                key = { platform -> platform.platform.name }
+            ) { platform ->
                 PlatformAccountRow(
                     authUiState = platform,
                     onAction = { onPlatformAction(platform.platform) }
@@ -1856,15 +1859,18 @@ private fun LocalPlaylistList(
 }
 
 @Composable
-private fun NeteasePlaylistList(
+private fun NeteaseLibraryList(
     playlists: List<PlaylistSummary>,
+    albums: List<AlbumSummary>,
     listState: LazyListState,
     authUiState: PlatformAuthUiState,
-    onClick: (PlaylistSummary) -> Unit,
+    onPlaylistClick: (PlaylistSummary) -> Unit,
+    onAlbumClick: (AlbumSummary) -> Unit,
     onAuthAction: () -> Unit
 ) {
     val context = LocalContext.current
     val miniPlayerHeight = LocalMiniPlayerHeight.current
+    val cardShape = RoundedCornerShape(12.dp)
 
     LazyColumn(
         state = listState,
@@ -1872,8 +1878,11 @@ private fun NeteasePlaylistList(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxSize()
     ) {
-        val cardShape = RoundedCornerShape(12.dp)
-        if (playlists.isEmpty() && authUiState.connectionState != PlatformConnectionState.Connected) {
+        if (
+            playlists.isEmpty() &&
+            albums.isEmpty() &&
+            authUiState.connectionState != PlatformConnectionState.Connected
+        ) {
             item {
                 PlatformAuthEmptyState(
                     authUiState = authUiState,
@@ -1881,47 +1890,42 @@ private fun NeteasePlaylistList(
                 )
             }
         }
-        items(
-            items = playlists,
-            key = { it.id }
-        ) { pl ->
-            Card(
-                shape = cardShape,
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.Transparent
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                modifier = Modifier
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .animateItem()
-                    .clip(cardShape)
-                    .clickable { onClick(pl) }
-            ) {
-                ListItem(
-                    headlineContent = { Text(pl.name) },
-                    supportingContent = {
-                        Text(
-                            stringResource(
-                                R.string.home_play_count_format,
-                                formatPlayCount(context, pl.playCount),
-                                pl.trackCount
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    colors = ListItemDefaults.colors(
-                        containerColor = Color.Transparent
-                    ),
-                    leadingContent = {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current).data(pl.picUrl).build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                    }
+
+        if (playlists.isNotEmpty()) {
+            item(key = "netease_playlists_header") {
+                NeteaseLibrarySectionHeader(
+                    title = stringResource(R.string.library_netease_section_playlists)
+                )
+            }
+
+            items(
+                items = playlists,
+                key = { "playlist:${it.id}" }
+            ) { playlist ->
+                NeteasePlaylistRow(
+                    playlist = playlist,
+                    context = context,
+                    cardShape = cardShape,
+                    onClick = { onPlaylistClick(playlist) }
+                )
+            }
+        }
+
+        if (albums.isNotEmpty()) {
+            item(key = "netease_albums_header") {
+                NeteaseLibrarySectionHeader(
+                    title = stringResource(R.string.library_netease_section_albums)
+                )
+            }
+
+            items(
+                items = albums,
+                key = { "album:${it.id}" }
+            ) { album ->
+                NeteaseAlbumRow(
+                    album = album,
+                    cardShape = cardShape,
+                    onClick = { onAlbumClick(album) }
                 )
             }
         }
@@ -1929,70 +1933,105 @@ private fun NeteasePlaylistList(
 }
 
 @Composable
-private fun NeteaseAlbumList(
-    playlists: List<AlbumSummary>,
-    listState: LazyListState,
-    authUiState: PlatformAuthUiState,
-    onClick: (AlbumSummary) -> Unit,
-    onAuthAction: () -> Unit
-) {
-    val miniPlayerHeight = LocalMiniPlayerHeight.current
+private fun NeteaseLibrarySectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)
+    )
+}
 
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp + miniPlayerHeight),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxSize()
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LazyItemScope.NeteasePlaylistRow(
+    playlist: PlaylistSummary,
+    context: Context,
+    cardShape: RoundedCornerShape,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .animateItem()
+            .clip(cardShape)
+            .clickable { onClick() }
     ) {
-        val cardShape = RoundedCornerShape(12.dp)
-        if (playlists.isEmpty() && authUiState.connectionState != PlatformConnectionState.Connected) {
-            item {
-                PlatformAuthEmptyState(
-                    authUiState = authUiState,
-                    onAction = onAuthAction
-                )
-            }
-        }
-        items(
-            items = playlists,
-            key = { it.id }
-        ) { pl ->
-            Card(
-                shape = cardShape,
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.Transparent
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                modifier = Modifier
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .animateItem()
-                    .clip(cardShape)
-                    .clickable { onClick(pl) }
-            ) {
-                ListItem(
-                    headlineContent = { Text(pl.name) },
-                    supportingContent = {
-                        Text(
-                            pluralStringResource(R.plurals.library_song_count, pl.size, pl.size),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    colors = ListItemDefaults.colors(
-                        containerColor = Color.Transparent
+        ListItem(
+            headlineContent = { Text(playlist.name) },
+            supportingContent = {
+                Text(
+                    stringResource(
+                        R.string.home_play_count_format,
+                        formatPlayCount(context, playlist.playCount),
+                        playlist.trackCount
                     ),
-                    leadingContent = {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current).data(pl.picUrl).build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                    }
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent
+            ),
+            leadingContent = {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(playlist.picUrl).build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp))
                 )
             }
-        }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LazyItemScope.NeteaseAlbumRow(
+    album: AlbumSummary,
+    cardShape: RoundedCornerShape,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .animateItem()
+            .clip(cardShape)
+            .clickable { onClick() }
+    ) {
+        ListItem(
+            headlineContent = { Text(album.name) },
+            supportingContent = {
+                Text(
+                    pluralStringResource(R.plurals.library_song_count, album.size, album.size),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent
+            ),
+            leadingContent = {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(album.picUrl).build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
+        )
     }
 }
 

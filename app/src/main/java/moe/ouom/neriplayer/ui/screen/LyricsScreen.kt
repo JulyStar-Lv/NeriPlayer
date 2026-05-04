@@ -28,8 +28,6 @@ import android.content.ClipData
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -49,6 +47,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -60,9 +59,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.SpeakerGroup
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.LibraryMusic
@@ -93,7 +90,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
@@ -146,6 +142,7 @@ fun LyricsScreen(
     onLyricFontScaleChange: (Float) -> Unit,
     onEnterAlbum: (AlbumSummary) -> Unit,
     onNavigateBack: () -> Unit,
+    onCollapse: () -> Unit = onNavigateBack,
     onSeekTo: (Long) -> Unit,
     advancedLyricsEnabled: Boolean = true,
     translatedLyrics: List<LyricEntry>? = null,
@@ -182,14 +179,7 @@ fun LyricsScreen(
     var pendingSyncConfirmAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingSyncConfirmLabel by remember { mutableStateOf("") }
 
-    // 动画状态
-    var isLyricsMode by remember { mutableStateOf(false) }
     var previewPositionOverrideMs by remember(currentSong?.id) { mutableStateOf<Long?>(null) }
-
-    // 启动进入动画
-    LaunchedEffect(Unit) {
-        isLyricsMode = true
-    }
 
     fun launchWithLocalSyncWarning(
         song: SongItem?,
@@ -205,18 +195,7 @@ fun LyricsScreen(
         }
     }
 
-    // 封面动画
-    val coverScale by animateFloatAsState(
-        targetValue = if (isLyricsMode) 0.6f else 1f,
-        animationSpec = spring(dampingRatio = 0.8f),
-        label = "cover_scale"
-    )
-    // 垂直偏移控制在标题栏内（约-8dp），避免飞出界面
-    val coverOffsetY by animateFloatAsState(
-        targetValue = if (isLyricsMode) -8f else 0f,
-        animationSpec = spring(dampingRatio = 0.8f),
-        label = "cover_offset_y"
-    )
+    val headerCoverSize = 44.dp
 
     // 播放控件动画 - 轻微上浮/下沉，保持常驻在安全区域内
 
@@ -244,28 +223,31 @@ fun LyricsScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start
         ) {
-            HapticIconButton(onClick = onNavigateBack) {
+            HapticIconButton(onClick = onCollapse) {
                 Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.cd_back))
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // 封面 - 紧邻返回键，缩小时约48dp
+            // 封面 - 使用稳定的小尺寸目标，避免 shared transition 叠加自身缩放动画
             Box(
                 modifier = Modifier
-                    .size((64 * coverScale).dp)
+                    .size(headerCoverSize)
                     .then(
                         if (sharedTransitionScope != null && animatedContentScope != null) {
                             with(sharedTransitionScope) {
                                 Modifier.sharedElement(
                                     rememberSharedContentState(key = "cover_image"),
-                                    animatedVisibilityScope = animatedContentScope
+                                    animatedVisibilityScope = animatedContentScope,
+                                    clipInOverlayDuringTransition = OverlayClip(
+                                        PlayerCoverArtworkShape
+                                    )
                                 )
                             }
                         } else Modifier
                     )
-                    .graphicsLayer { translationY = coverOffsetY }
-                    .clip(RoundedCornerShape(10.dp))
+                    .offset(y = 2.dp)
+                    .clip(PlayerCoverArtworkShape)
             ) {
                 currentCoverUrl?.let { cover ->
                     AsyncImage(
@@ -329,16 +311,6 @@ fun LyricsScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .then(
-                                if (sharedTransitionScope != null && animatedContentScope != null) {
-                                    with(sharedTransitionScope) {
-                                        Modifier.sharedElement(
-                                            rememberSharedContentState(key = "song_artist"),
-                                            animatedVisibilityScope = animatedContentScope
-                                        )
-                                    }
-                                } else Modifier
-                            )
                             .clip(RoundedCornerShape(6.dp))
                             .combinedClickable(
                                 onClick = {},
@@ -660,38 +632,6 @@ fun LyricsScreen(
                 )
             }
 
-            // 音量按钮（根据设备显示不同图标，居中）
-            val context = LocalContext.current
-            val audioManager = remember { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
-            val devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-            val audioDeviceIcon = remember(devices) {
-                when {
-                    devices.any { it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP } -> Icons.Default.Headset
-                    devices.any { it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET || it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES } -> Icons.Default.Headset
-                    else -> Icons.Default.SpeakerGroup
-                }
-            }
-            var showVolumeSheet by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showVolumeSheet = true },
-                modifier = Modifier.then(
-                    if (sharedTransitionScope != null && animatedContentScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier.sharedBounds(
-                                rememberSharedContentState(key = "btn_volume"),
-                                animatedVisibilityScope = animatedContentScope,
-                                enter = EnterTransition.None,
-                                exit = ExitTransition.None,
-                            ).zIndex(1f)
-                        }
-                    } else Modifier
-                )) {
-                Icon(
-                    audioDeviceIcon,
-                    contentDescription = stringResource(R.string.cd_audio_device),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
             // 歌词按钮（返回封面页，高亮显示）
             @SuppressLint("UnusedContentLambdaTargetStateParameter")
             HapticIconButton(onClick = onNavigateBack,
@@ -750,16 +690,6 @@ fun LyricsScreen(
                 moe.ouom.neriplayer.ui.component.SleepTimerDialog(
                     onDismiss = { showSleepTimerDialog = false }
                 )
-            }
-
-            // 音量控制弹窗
-            if (showVolumeSheet) {
-                androidx.compose.material3.ModalBottomSheet(
-                    onDismissRequest = { showVolumeSheet = false },
-                    sheetGesturesEnabled = false
-                ) {
-                    VolumeControlSheetContent()
-                }
             }
 
             // 播放队列弹窗
@@ -1118,4 +1048,3 @@ private fun LyricsProgressSection(
         )
     }
 }
-

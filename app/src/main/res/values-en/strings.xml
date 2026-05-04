@@ -685,6 +685,7 @@
     <string name="dialog_disclaimer">Disclaimer &amp; Privacy</string>
     <string name="dialog_agree">I Agree</string>
     <string name="dialog_no_remind">Don\'t Remind Again</string>
+    <string name="dialog_remember_no_remind">Remember, don\'t remind again</string>
 
     <!-- Common -->
     <string name="common_all">All</string>
@@ -1345,6 +1346,7 @@
     <string name="home_title_brand_wave">NeriPlayer~</string>
     <string name="home_title_brand_call">Hey, NeriPlayer</string>
     <string name="home_all_cards_hidden">All home cards are hidden. Re-enable them in Settings.</string>
+    <string name="home_section_empty">Nothing here yet</string>
 
     <!-- Library / Screen -->
     <string name="library_tab_local">Local</string>
@@ -1375,6 +1377,8 @@
     <string name="library_platform_empty_bilibili">Sign in to load your Bilibili favorite folders</string>
     <string name="library_platform_empty_youtube">Sign in to load your YouTube Music playlists</string>
     <string name="library_platform_qqmusic_auth_hint">QQ Music library and sign-in are still in development</string>
+    <string name="library_netease_section_playlists">Playlists</string>
+    <string name="library_netease_section_albums">Albums</string>
     <string name="library_favorite_source_format" formatted="false">%d songs · %s</string>
     <string name="library_favorite_sort_mode_title">Favorite Playlist Order</string>
     <string name="library_favorite_sort_mode_desc">Long press a playlist to enter sorting mode, then drag the handle</string>

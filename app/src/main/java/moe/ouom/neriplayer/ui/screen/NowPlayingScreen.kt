@@ -25,13 +25,9 @@ package moe.ouom.neriplayer.ui.screen
 
 import android.Manifest
 import android.content.ClipData
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.media.AudioDeviceCallback
-import android.media.AudioDeviceInfo
-import android.media.AudioManager
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -94,11 +90,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SpeakerGroup
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -160,7 +154,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
@@ -201,6 +194,7 @@ import moe.ouom.neriplayer.core.download.ManagedDownloadStorage
 import moe.ouom.neriplayer.core.download.shouldHideRemoteDownloadAction
 import moe.ouom.neriplayer.core.player.AudioDownloadManager
 import moe.ouom.neriplayer.core.player.PlayerManager
+import moe.ouom.neriplayer.core.player.metadata.parseLyricsWithPlainTextFallback
 import moe.ouom.neriplayer.core.player.model.PlaybackAudioInfo
 import moe.ouom.neriplayer.core.player.model.PlaybackQualityOption
 import moe.ouom.neriplayer.data.local.media.LocalMediaSupport
@@ -240,7 +234,6 @@ import moe.ouom.neriplayer.ui.component.SleepTimerDialog
 import moe.ouom.neriplayer.ui.component.WaveformSlider
 import moe.ouom.neriplayer.ui.component.bottomSheetDragBlocker
 import moe.ouom.neriplayer.ui.component.bottomSheetScrollGuard
-import moe.ouom.neriplayer.ui.component.parseNeteaseLyricsAuto
 import moe.ouom.neriplayer.ui.component.resolveLyricsEditorInitialText
 import moe.ouom.neriplayer.ui.component.resolveLyricsEditorSeed
 import moe.ouom.neriplayer.ui.component.resolvePreferredLyricContent
@@ -502,10 +495,6 @@ fun NowPlayingScreen(
     // 内容的进入动画
     var contentVisible by remember { mutableStateOf(false) }
 
-    // 控制音量弹窗的显示
-    var showVolumeSheet by remember { mutableStateOf(false) }
-    val volumeSheetState = rememberModalBottomSheetState()
-
     var lyrics by remember(currentSong?.id) { mutableStateOf<List<LyricEntry>>(emptyList()) }
     var translatedLyrics by remember(currentSong?.id) { mutableStateOf<List<LyricEntry>>(emptyList()) }
     var rawLyricsText by remember(currentSong?.id) { mutableStateOf<String?>(null) }
@@ -550,7 +539,7 @@ fun NowPlayingScreen(
                     currentMediaUrl.isNullOrBlank()
             val resolvedLyrics = when {
                 !effectiveRawLyrics.isNullOrBlank() -> {
-                    parseNeteaseLyricsAuto(effectiveRawLyrics)
+                    parseLyricsWithPlainTextFallback(effectiveRawLyrics, song?.durationMs ?: 0L)
                 }
                 shouldDelayOnlineLyrics -> {
                     // 当前曲目还在抢首播地址，先别让歌词请求去争 EJS 和鉴权链路
@@ -571,7 +560,10 @@ fun NowPlayingScreen(
                         if (storedRawTranslatedLyrics.isBlank()) {
                             emptyList()
                         } else {
-                            parseNeteaseLyricsAuto(storedRawTranslatedLyrics)
+                            parseLyricsWithPlainTextFallback(
+                                storedRawTranslatedLyrics,
+                                song?.durationMs ?: 0L
+                            )
                         }
                     }
                     song != null -> {
@@ -727,6 +719,7 @@ fun NowPlayingScreen(
                             onEnterAlbum = onEnterAlbum,
                             onLyricFontScaleChange = onLyricFontScaleChange,
                             onNavigateBack = { showLyricsScreen = false },
+                            onCollapse = onNavigateUp,
                             onSeekTo = { position -> PlayerManager.seekTo(position) },
                             advancedLyricsEnabled = advancedLyricsEnabled,
                             translatedLyrics = translatedLyrics,
@@ -896,9 +889,12 @@ fun NowPlayingScreen(
                                     .fillMaxSize()
                                     .sharedElement(
                                         rememberSharedContentState(key = "cover_image"),
-                                        animatedVisibilityScope = this@AnimatedContent
+                                        animatedVisibilityScope = this@AnimatedContent,
+                                        clipInOverlayDuringTransition = OverlayClip(
+                                            PlayerCoverArtworkShape
+                                        )
                                     )
-                                    .clip(RoundedCornerShape(24.dp))
+                                    .clip(PlayerCoverArtworkShape)
                                     .background(
                                         color = if (currentCoverUrl != null) {
                                             Color.Transparent
@@ -1042,10 +1038,6 @@ fun NowPlayingScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
-                                        .sharedElement(
-                                            rememberSharedContentState(key = "song_artist"),
-                                            animatedVisibilityScope = this@AnimatedContent
-                                        )
                                         .clip(RoundedCornerShape(8.dp))
                                         .combinedClickable(
                                             onClick = {},
@@ -1263,24 +1255,6 @@ fun NowPlayingScreen(
                                     )
                                 }
 
-                                // 音量按钮（根据设备显示不同图标，居中）
-                                val audioDeviceInfo = rememberAudioDeviceInfo()
-                                HapticIconButton(onClick = { showVolumeSheet = true },
-                                    modifier = Modifier
-                                    .sharedBounds(
-                                        rememberSharedContentState(key = "btn_volume"),
-                                        animatedVisibilityScope = this@AnimatedContent,
-                                        enter = EnterTransition.None,
-                                        exit = ExitTransition.None,
-                                    ).zIndex(1f)
-                                ) {
-                                    Icon(
-                                        audioDeviceInfo.second,
-                                        contentDescription = audioDeviceInfo.first,
-                                        modifier = Modifier.size(if (useWideLandscapeLayout) 22.dp else 20.dp)
-                                    )
-                                }
-
                                 // 歌词按钮
                                 HapticIconButton(
                                     onClick = { showLyricsScreen = !showLyricsScreen },
@@ -1415,17 +1389,6 @@ fun NowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         content = mainColumnContent
                     )
-                }
-            }
-
-            // 音量控制弹窗
-            if (showVolumeSheet) {
-                ModalBottomSheet(
-                    onDismissRequest = { showVolumeSheet = false },
-                    sheetState = volumeSheetState,
-                    sheetGesturesEnabled = false
-                ) {
-                    VolumeControlSheetContent()
                 }
             }
 
@@ -1623,44 +1586,6 @@ fun NowPlayingScreen(
     }
 }
 }
-}
-
-@Composable
-fun rememberAudioDeviceInfo(): Pair<String, ImageVector> {
-    val context = LocalContext.current
-    val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
-    var deviceInfo by remember { mutableStateOf(getCurrentAudioDevice(audioManager, context)) }
-
-    DisposableEffect(Unit) {
-        val deviceCallback = object : AudioDeviceCallback() {
-            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
-                deviceInfo = getCurrentAudioDevice(audioManager, context)
-            }
-            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
-                deviceInfo = getCurrentAudioDevice(audioManager, context)
-            }
-        }
-        audioManager.registerAudioDeviceCallback(deviceCallback, null)
-        onDispose { audioManager.unregisterAudioDeviceCallback(deviceCallback) }
-    }
-
-    return deviceInfo
-}
-
-fun getCurrentAudioDevice(audioManager: AudioManager, context: Context): Pair<String, ImageVector> {
-    val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-    val bluetoothDevice = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
-    if (bluetoothDevice != null) {
-        return try {
-            Pair(bluetoothDevice.productName.toString().ifBlank { context.getString(R.string.nowplaying_bluetooth_device) }, Icons.Default.Headset)
-        } catch (_: SecurityException) {
-            Pair(context.getString(R.string.nowplaying_bluetooth_device), Icons.Default.Headset)
-        }
-    }
-    val wiredHeadset =
-        devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET || it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES }
-    if (wiredHeadset != null) return Pair(context.getString(R.string.nowplaying_wired_headset), Icons.Default.Headset)
-    return Pair(context.getString(R.string.nowplaying_phone_speaker), Icons.Default.SpeakerGroup)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2290,46 +2215,6 @@ fun NowPlayingQualityOptionsDialog(
             }
         }
     )
-}
-
-@Composable
-fun VolumeControlSheetContent() {
-    val context = LocalContext.current
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-    val maxVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
-    var currentVolume by remember { mutableIntStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) }
-
-    // 获取当前音频设备信息
-    val audioDeviceInfo = rememberAudioDeviceInfo()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .bottomSheetDragBlocker()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
-            .windowInsetsPadding(WindowInsets.navigationBars),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(audioDeviceInfo.first, style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(imageVector = audioDeviceInfo.second, contentDescription = audioDeviceInfo.first)
-            Slider(
-                value = currentVolume.toFloat(),
-                onValueChange = {
-                    currentVolume = it.toInt()
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, currentVolume, 0)
-                },
-                valueRange = 0f..maxVolume.toFloat(),
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-    }
 }
 
 @Composable

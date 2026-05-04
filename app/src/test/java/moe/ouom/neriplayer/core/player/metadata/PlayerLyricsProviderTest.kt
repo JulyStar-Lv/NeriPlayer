@@ -81,4 +81,24 @@ class PlayerLyricsProviderTest {
         assertEquals("难以忘记", entry.preferredLyricEntries.single().text)
         assertEquals("hard to forget", entry.translatedLyricEntries.single().text)
     }
+
+    @Test
+    fun `parseLyricsWithPlainTextFallback spreads plain embedded lyrics across duration`() {
+        val entries = parseLyricsWithPlainTextFallback(
+            rawLyric = """
+                [ar:demo]
+                line one
+                line two
+            """.trimIndent(),
+            durationMs = 10_000L
+        )
+
+        assertEquals(2, entries.size)
+        assertEquals("line one", entries[0].text)
+        assertEquals(0L, entries[0].startTimeMs)
+        assertEquals(5_000L, entries[0].endTimeMs)
+        assertEquals("line two", entries[1].text)
+        assertEquals(5_000L, entries[1].startTimeMs)
+        assertEquals(10_000L, entries[1].endTimeMs)
+    }
 }

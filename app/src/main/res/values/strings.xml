@@ -685,6 +685,7 @@
     <string name="dialog_disclaimer">免责声明与隐私说明</string>
     <string name="dialog_agree">我已知晓并同意</string>
     <string name="dialog_no_remind">不再提醒</string>
+    <string name="dialog_remember_no_remind">记住，不再提示</string>
 
     <!-- Common -->
     <string name="common_all">全部</string>
@@ -1360,6 +1361,7 @@
     <string name="home_title_brand_wave">音理音理~</string>
     <string name="home_title_brand_call">NeriPlayer</string>
     <string name="home_all_cards_hidden">首页卡片已全部隐藏，可在设置中重新开启。</string>
+    <string name="home_section_empty">暂无内容</string>
 
     <!-- Library / Screen -->
     <string name="library_tab_local">本地</string>
@@ -1390,6 +1392,8 @@
     <string name="library_platform_empty_bilibili">登录后会从哔哩哔哩拉取你的收藏夹</string>
     <string name="library_platform_empty_youtube">登录后会从 YouTube Music 拉取你的歌单</string>
     <string name="library_platform_qqmusic_auth_hint">QQ 音乐库页和登录能力还在开发中</string>
+    <string name="library_netease_section_playlists">歌单</string>
+    <string name="library_netease_section_albums">专辑</string>
     <string name="library_favorite_source_format" formatted="false">%d首 · %s</string>
     <string name="library_favorite_sort_mode_title">收藏歌单排序</string>
     <string name="library_favorite_sort_mode_desc">长按歌单进入排序，拖动右侧手柄调整顺序</string>
