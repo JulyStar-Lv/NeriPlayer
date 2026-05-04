@@ -25,6 +25,8 @@ package moe.ouom.neriplayer.ui
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -72,6 +74,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -102,6 +105,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -285,6 +289,22 @@ private fun View.drawScaledThemeRevealBitmap(): Bitmap? {
             draw(canvas)
         }
     }.getOrNull()
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private fun updateStatusBarIconAppearance(
+    context: Context,
+    fallbackView: View,
+    useDarkIcons: Boolean
+) {
+    val activity = context.findActivity() ?: fallbackView.context.findActivity() ?: return
+    val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+    controller.isAppearanceLightStatusBars = useDarkIcons
 }
 
 private suspend fun captureThemeRevealSnapshot(
@@ -801,6 +821,13 @@ private fun NeriAppContent(
         forceDark -> true
         followSystemDark -> isSystemInDarkTheme()
         else -> false
+    }
+    SideEffect {
+        updateStatusBarIconAppearance(
+            context = context,
+            fallbackView = rootView,
+            useDarkIcons = if (showNowPlaying) false else !isDark
+        )
     }
     val hazeState = remember { HazeState() }
     val preferredQuality by repo.audioQualityFlow.collectAsState(initial = "exhigh")
