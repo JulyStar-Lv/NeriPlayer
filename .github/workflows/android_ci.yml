@@ -3,7 +3,7 @@ name: NeriPlayer Android CI
 on:
   push:
     branches:
-      - master
+      - codex/dev
     paths-ignore:
       - '*.md'
       - '**/*.md'
@@ -16,7 +16,7 @@ on:
       - '.idea/**'
   pull_request:
     branches:
-      - master
+      - codex/dev
     paths-ignore:
       - '*.md'
       - '**/*.md'
