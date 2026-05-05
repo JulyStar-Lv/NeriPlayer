@@ -3,7 +3,8 @@ name: NeriPlayer Android CI
 on:
   push:
     branches:
-      - codex/dev
+      - master
+      - 'codex/**'
     paths-ignore:
       - '*.md'
       - '**/*.md'
@@ -12,11 +13,11 @@ on:
       - 'renovate.json'
       - '.editorconfig'
       - '.gitignore'
-      - '.github/**'
       - '.idea/**'
   pull_request:
     branches:
-      - codex/dev
+      - master
+      - 'codex/**'
     paths-ignore:
       - '*.md'
       - '**/*.md'
@@ -25,14 +26,13 @@ on:
       - 'renovate.json'
       - '.editorconfig'
       - '.gitignore'
-      - '.github/**'
       - '.idea/**'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.event.head_commit.message, '[skip ci]') && (github.ref == 'refs/heads/master' || github.event_name == 'pull_request') }}
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,6 +58,10 @@ jobs:
       - name: Grant execute permission
         run: chmod +x gradlew
 
+      - name: Build Debug for branch push
+        if: github.event_name == 'push' && github.ref != 'refs/heads/master'
+        run: ./gradlew :app:assembleDebug --warning-mode all --stacktrace
+
       - name: Build unsigned Release for PR
         if: github.event_name == 'pull_request'
         run: ./gradlew assembleRelease --warning-mode all --stacktrace
@@ -78,3 +82,10 @@ jobs:
         with:
           name: neri-apk
           path: app/build/outputs/apk/release/**/*.apk
+
+      - name: Upload Debug APK
+        if: github.event_name == 'push' && github.ref != 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: neri-debug-apk
+          path: app/build/outputs/apk/debug/**/*.apk
