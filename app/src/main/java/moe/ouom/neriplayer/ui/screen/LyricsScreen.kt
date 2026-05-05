@@ -256,40 +256,46 @@ fun LyricsScreen(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // 封面 - 使用稳定的小尺寸目标，避免 shared transition 叠加自身缩放动画
+            // 外层只负责最终尺寸和位置，内层参与共享转场，避免 overlay 结束时再应用位移造成跳变。
             Box(
                 modifier = Modifier
                     .size(headerCoverSize)
-                    .then(
-                        if (sharedTransitionScope != null && animatedContentScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedElement(
-                                    rememberSharedContentState(key = "cover_image"),
-                                    animatedVisibilityScope = animatedContentScope,
-                                    clipInOverlayDuringTransition = OverlayClip(
-                                        PlayerCoverArtworkShape
-                                    )
-                                )
-                            }
-                        } else Modifier
-                    )
                     .offset(y = 2.dp)
                     .clip(PlayerCoverArtworkShape)
             ) {
-                currentCoverUrl?.let { cover ->
-                    AsyncImage(
-                        model = remember(context, cover) {
-                            offlineCachedImageRequest(
-                                context = context,
-                                data = cover,
-                                sizePx = 192,
-                                allowHardware = false
-                            )
-                        },
-                        contentDescription = currentSong?.displayName() ?: "",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (sharedTransitionScope != null && animatedContentScope != null) {
+                                with(sharedTransitionScope) {
+                                    Modifier.sharedElement(
+                                        rememberSharedContentState(key = "cover_image"),
+                                        animatedVisibilityScope = animatedContentScope,
+                                        clipInOverlayDuringTransition = OverlayClip(
+                                            PlayerCoverArtworkShape
+                                        )
+                                    )
+                                }
+                            } else Modifier
+                        )
+                        .clip(PlayerCoverArtworkShape)
+                ) {
+                    currentCoverUrl?.let { cover ->
+                        AsyncImage(
+                            model = remember(context, cover) {
+                                offlineCachedImageRequest(
+                                    context = context,
+                                    data = cover,
+                                    sizePx = 192,
+                                    allowHardware = false
+                                )
+                            },
+                            contentDescription = currentSong?.displayName() ?: "",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 

@@ -179,8 +179,6 @@
     <string name="settings_nowplaying_title_desc">Controls whether the &quot;Now Playing&quot; title appears at the top of the player page</string>
     <string name="settings_nowplaying_progress_quality_switch">Show current quality above progress bar</string>
     <string name="settings_nowplaying_progress_quality_switch_desc">Shown above the progress bar; quality switching is available in More Options</string>
-    <string name="settings_nowplaying_toolbar_dock">Use dock-style bottom toolbar</string>
-    <string name="settings_nowplaying_toolbar_dock_desc">Show a rounded dock container for the bottom toolbar on Now Playing</string>
     <string name="settings_nowplaying_progress_audio_codec">Show codec above progress bar</string>
     <string name="settings_nowplaying_progress_audio_codec_desc">Shown above the progress bar, such as FLAC, AAC, or E-AC-3</string>
     <string name="settings_nowplaying_progress_audio_spec">Show audio spec above progress bar</string>

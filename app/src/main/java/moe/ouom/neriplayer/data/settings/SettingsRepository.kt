@@ -29,6 +29,7 @@ import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import moe.ouom.neriplayer.core.download.ManagedDownloadStorage
 import moe.ouom.neriplayer.core.download.normalizeDownloadFileNameTemplate
@@ -57,7 +58,7 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.data.map { it[SettingsKeys.SHOW_COVER_SOURCE_BADGE] ?: true }
 
     val nowPlayingToolbarDockEnabledFlow: Flow<Boolean> =
-        context.dataStore.data.map { it[SettingsKeys.NOWPLAYING_TOOLBAR_DOCK_ENABLED] ?: true }
+        flowOf(false)
 
     val nowPlayingShowTitleFlow: Flow<Boolean> =
         context.dataStore.data.map { it[SettingsKeys.NOWPLAYING_SHOW_TITLE] ?: true }
@@ -311,10 +312,6 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setShowCoverSourceBadge(enabled: Boolean) {
         context.dataStore.edit { it[SettingsKeys.SHOW_COVER_SOURCE_BADGE] = enabled }
-    }
-
-    suspend fun setNowPlayingToolbarDockEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[SettingsKeys.NOWPLAYING_TOOLBAR_DOCK_ENABLED] = enabled }
     }
 
     suspend fun setNowPlayingShowTitle(enabled: Boolean) {
