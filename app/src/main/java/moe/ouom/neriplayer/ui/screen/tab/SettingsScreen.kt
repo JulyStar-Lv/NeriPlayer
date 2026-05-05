@@ -226,8 +226,6 @@ fun SettingsScreen(
     onHapticFeedbackEnabledChange: (Boolean) -> Unit,
     showCoverSourceBadge: Boolean,
     onShowCoverSourceBadgeChange: (Boolean) -> Unit,
-    nowPlayingToolbarDockEnabled: Boolean,
-    onNowPlayingToolbarDockEnabledChange: (Boolean) -> Unit,
     showNowPlayingTitle: Boolean,
     onShowNowPlayingTitleChange: (Boolean) -> Unit,
     showNowPlayingProgressQualitySwitch: Boolean,
@@ -1192,26 +1190,6 @@ fun SettingsScreen(
                                 Switch(
                                     checked = showNowPlayingTitle,
                                     onCheckedChange = onShowNowPlayingTitleChange
-                                )
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
-
-                        ListItem(
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Home,
-                                    contentDescription = stringResource(R.string.settings_nowplaying_toolbar_dock),
-                                    modifier = Modifier.size(24.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            },
-                            headlineContent = { Text(stringResource(R.string.settings_nowplaying_toolbar_dock)) },
-                            supportingContent = { Text(stringResource(R.string.settings_nowplaying_toolbar_dock_desc)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = nowPlayingToolbarDockEnabled,
-                                    onCheckedChange = onNowPlayingToolbarDockEnabledChange
                                 )
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)

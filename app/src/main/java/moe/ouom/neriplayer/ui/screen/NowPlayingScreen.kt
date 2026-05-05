@@ -361,7 +361,7 @@ fun NowPlayingScreen(
         .collectAsState(initial = true)
     val nowPlayingToolbarDockEnabled by settingsRepo
         .nowPlayingToolbarDockEnabledFlow
-        .collectAsState(initial = true)
+        .collectAsState(initial = false)
     val showProgressAudioCodec by settingsRepo
         .nowPlayingProgressShowAudioCodecFlow
         .collectAsState(initial = true)

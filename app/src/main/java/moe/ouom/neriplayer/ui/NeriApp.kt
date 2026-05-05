@@ -576,7 +576,6 @@ private fun NeriAppContent(
     val backgroundImageAlpha by repo.backgroundImageAlphaFlow.collectAsState(initial = 0.3f)
     val hapticFeedbackEnabled by repo.hapticFeedbackEnabledFlow.collectAsState(initial = true)
     val showCoverSourceBadge by repo.showCoverSourceBadgeFlow.collectAsState(initial = true)
-    val nowPlayingToolbarDockEnabled by repo.nowPlayingToolbarDockEnabledFlow.collectAsState(initial = true)
     val showNowPlayingTitle by repo.nowPlayingShowTitleFlow.collectAsState(initial = true)
     val showNowPlayingProgressQualitySwitch by repo.nowPlayingProgressShowQualitySwitchFlow.collectAsState(initial = true)
     val showNowPlayingProgressAudioCodec by repo.nowPlayingProgressShowAudioCodecFlow.collectAsState(initial = true)
@@ -1577,10 +1576,6 @@ private fun NeriAppContent(
                                         showCoverSourceBadge = showCoverSourceBadge,
                                         onShowCoverSourceBadgeChange = { enabled ->
                                             scope.launch { repo.setShowCoverSourceBadge(enabled) }
-                                        },
-                                        nowPlayingToolbarDockEnabled = nowPlayingToolbarDockEnabled,
-                                        onNowPlayingToolbarDockEnabledChange = { enabled ->
-                                            scope.launch { repo.setNowPlayingToolbarDockEnabled(enabled) }
                                         },
                                         showNowPlayingTitle = showNowPlayingTitle,
                                         onShowNowPlayingTitleChange = { enabled ->
