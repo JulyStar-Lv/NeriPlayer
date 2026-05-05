@@ -24,9 +24,25 @@ package moe.ouom.neriplayer.core.player.metadata
  */
 
 import moe.ouom.neriplayer.ui.component.LyricEntry
+import moe.ouom.neriplayer.ui.component.parseNeteaseLyricsAuto
+
+private val lrcMetadataKeys = setOf("al", "ar", "au", "by", "length", "offset", "re", "ti", "ve")
+
+internal fun parseLyricsWithPlainTextFallback(
+    rawLyric: String,
+    durationMs: Long
+): List<LyricEntry> {
+    val timedEntries = parseNeteaseLyricsAuto(rawLyric)
+    if (timedEntries.isNotEmpty()) {
+        return timedEntries
+    }
+    return convertPlainLyricsToEntries(rawLyric, durationMs)
+}
 
 internal fun convertPlainLyricsToEntries(text: String, durationMs: Long): List<LyricEntry> {
-    val lines = text.lines().filter { it.isNotBlank() }
+    val lines = text.lines()
+        .map { it.trim() }
+        .filter { it.isNotBlank() && !it.isLrcMetadataLine() && !it.isEmptyTimestampLine() }
     if (lines.isEmpty()) {
         return emptyList()
     }
@@ -46,4 +62,18 @@ internal fun convertPlainLyricsToEntries(text: String, durationMs: Long): List<L
             endTimeMs = endMs
         )
     }
+}
+
+private fun String.isLrcMetadataLine(): Boolean {
+    if (!startsWith("[") || !endsWith("]")) {
+        return false
+    }
+    val key = substringAfter("[")
+        .substringBefore(":")
+        .lowercase()
+    return key in lrcMetadataKeys
+}
+
+private fun String.isEmptyTimestampLine(): Boolean {
+    return matches(Regex("""\[\d{2}:\d{2}(?:[.:]\d{2,3})?]\s*"""))
 }

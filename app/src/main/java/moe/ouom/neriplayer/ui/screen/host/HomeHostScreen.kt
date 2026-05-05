@@ -51,7 +51,10 @@ import moe.ouom.neriplayer.ui.screen.playlist.LocalPlaylistDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.NeteaseAlbumDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.NeteasePlaylistDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.YouTubeMusicPlaylistDetailScreen
+import moe.ouom.neriplayer.ui.screen.tab.HomePlaylistGridItem
+import moe.ouom.neriplayer.ui.screen.tab.HomePlaylistGridScreen
 import moe.ouom.neriplayer.ui.screen.tab.HomeScreen
+import moe.ouom.neriplayer.ui.screen.tab.HomeSongCollectionDetailScreen
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 import moe.ouom.neriplayer.ui.viewmodel.tab.AlbumSummary
 import moe.ouom.neriplayer.ui.viewmodel.tab.BiliPlaylist
@@ -70,14 +73,21 @@ private sealed class HomeSelectedItem {
     data class Local(val playlistId: Long) : HomeSelectedItem()
     data class Bili(val playlist: BiliPlaylist) : HomeSelectedItem()
     data class YouTubeMusic(val playlist: YouTubeMusicPlaylist) : HomeSelectedItem()
+    data class SongSection(val title: String, val songs: List<SongItem>) : HomeSelectedItem()
+    data class PlaylistSection(
+        val title: String,
+        val playlists: List<HomePlaylistGridItem>
+    ) : HomeSelectedItem()
 }
 
 @Composable
 fun HomeHostScreen(
     showContinueCard: Boolean = true,
+    showRecentCard: Boolean = true,
     showTrendingCard: Boolean = true,
     showRadarCard: Boolean = true,
     showRecommendedCard: Boolean = true,
+    onOpenRecentScreen: () -> Unit = {},
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> }
 ) {
     var selected by rememberSaveable(stateSaver = homeSelectedItemSaver) {
@@ -112,6 +122,7 @@ fun HomeHostScreen(
             if (current == null) {
                 HomeScreen(
                     showContinueCard = showContinueCard,
+                    showRecentCard = showRecentCard,
                     showTrendingCard = showTrendingCard,
                     showRadarCard = showRadarCard,
                     showRecommendedCard = showRecommendedCard,
@@ -138,10 +149,35 @@ fun HomeHostScreen(
                     onOpenRecent = { entry ->
                         openRecent(entry) { next -> selected = next }
                     },
+                    onOpenRecentScreen = onOpenRecentScreen,
+                    onOpenSongSection = { title, songs ->
+                        selected = HomeSelectedItem.SongSection(title, songs)
+                    },
+                    onOpenPlaylistSection = { title, playlists ->
+                        selected = HomeSelectedItem.PlaylistSection(title, playlists)
+                    },
                     onSongClick = onSongClick    // 透传给 HomeScreen，点击推荐歌曲可直接播放
                 )
             } else {
                 when (current) {
+                    is HomeSelectedItem.SongSection -> {
+                        HomeSongCollectionDetailScreen(
+                            title = current.title,
+                            songs = current.songs,
+                            onBack = { selected = null },
+                            onSongClick = onSongClick
+                        )
+                    }
+                    is HomeSelectedItem.PlaylistSection -> {
+                        HomePlaylistGridScreen(
+                            title = current.title,
+                            playlists = current.playlists,
+                            onBack = { selected = null },
+                            onPlaylistClick = { item ->
+                                openHomePlaylistGridItem(item) { next -> selected = next }
+                            }
+                        )
+                    }
                     is HomeSelectedItem.NeteaseAlbumList -> {
                         NeteaseAlbumDetailScreen(
                             album = current.album,
@@ -213,6 +249,16 @@ private val homeSelectedItemSaver = mapSaver<HomeSelectedItem?>(
                 "type" to "ytmusic",
                 "playlist" to item.playlist.toSaveMap()
             )
+            is HomeSelectedItem.SongSection -> hashMapOf(
+                "type" to "songSection",
+                "title" to item.title,
+                "songs" to ArrayList(item.songs)
+            )
+            is HomeSelectedItem.PlaylistSection -> hashMapOf(
+                "type" to "playlistSection",
+                "title" to item.title,
+                "playlists" to ArrayList(item.playlists)
+            )
         }
     },
     restore = { saved ->
@@ -223,10 +269,128 @@ private val homeSelectedItemSaver = mapSaver<HomeSelectedItem?>(
             "netease" -> restorePlaylistSummary(saved["playlist"] as? Map<*, *>)?.let { HomeSelectedItem.Netease(it) }
             "bili" -> restoreBiliPlaylist(saved["playlist"] as? Map<*, *>)?.let { HomeSelectedItem.Bili(it) }
             "ytmusic" -> restoreYouTubeMusicPlaylist(saved["playlist"] as? Map<*, *>)?.let { HomeSelectedItem.YouTubeMusic(it) }
+            "songSection" -> {
+                val title = saved["title"] as? String
+                val songs = (saved["songs"] as? List<*>)
+                    ?.filterIsInstance<SongItem>()
+                    .orEmpty()
+                title?.let { HomeSelectedItem.SongSection(it, songs) }
+            }
+            "playlistSection" -> {
+                val title = saved["title"] as? String
+                val playlists = (saved["playlists"] as? List<*>)
+                    ?.filterIsInstance<HomePlaylistGridItem>()
+                    .orEmpty()
+                title?.let { HomeSelectedItem.PlaylistSection(it, playlists) }
+            }
             else -> null
         }
     }
 )
+
+private fun openHomePlaylistGridItem(
+    item: HomePlaylistGridItem,
+    onSelected: (HomeSelectedItem) -> Unit
+) {
+    when (item.source.lowercase()) {
+        "netease" -> {
+            recordHomePlaylistOpen(item)
+            onSelected(
+                HomeSelectedItem.Netease(
+                    PlaylistSummary(
+                        id = item.id,
+                        name = item.title,
+                        picUrl = item.coverUrl,
+                        playCount = item.playCount,
+                        trackCount = item.trackCount
+                    )
+                )
+            )
+        }
+        "neteasealbum" -> {
+            recordHomePlaylistOpen(item)
+            onSelected(
+                HomeSelectedItem.NeteaseAlbumList(
+                    AlbumSummary(
+                        id = item.id,
+                        name = item.title,
+                        picUrl = item.coverUrl,
+                        size = item.trackCount
+                    )
+                )
+            )
+        }
+        "local" -> {
+            recordHomePlaylistOpen(item)
+            onSelected(HomeSelectedItem.Local(item.id))
+        }
+        "bili" -> {
+            recordHomePlaylistOpen(item)
+            onSelected(
+                HomeSelectedItem.Bili(
+                    BiliPlaylist(
+                        mediaId = item.id,
+                        title = item.title,
+                        coverUrl = item.coverUrl,
+                        count = item.trackCount,
+                        fid = item.fid,
+                        mid = item.mid
+                    )
+                )
+            )
+        }
+        "youtubemusic" -> {
+            val resolvedBrowseId = item.browseId
+                ?.takeIf { it.isNotBlank() }
+                ?: item.playlistId
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { if (it.startsWith("VL")) it else "VL$it" }
+                ?: return
+            val resolvedPlaylistId = item.playlistId.orEmpty().ifBlank {
+                if (resolvedBrowseId.startsWith("VL")) {
+                    resolvedBrowseId.removePrefix("VL")
+                } else {
+                    resolvedBrowseId
+                }
+            }
+            recordHomePlaylistOpen(
+                item = item,
+                browseId = resolvedBrowseId,
+                playlistId = resolvedPlaylistId
+            )
+            onSelected(
+                HomeSelectedItem.YouTubeMusic(
+                    YouTubeMusicPlaylist(
+                        browseId = resolvedBrowseId,
+                        playlistId = resolvedPlaylistId,
+                        title = item.title,
+                        subtitle = item.subtitle,
+                        coverUrl = item.coverUrl,
+                        trackCount = item.trackCount
+                    )
+                )
+            )
+        }
+    }
+}
+
+private fun recordHomePlaylistOpen(
+    item: HomePlaylistGridItem,
+    browseId: String? = item.browseId,
+    playlistId: String? = item.playlistId
+) {
+    AppContainer.playlistUsageRepo.recordOpen(
+        id = item.id,
+        name = item.title,
+        picUrl = item.coverUrl,
+        trackCount = item.trackCount,
+        source = item.source,
+        fid = item.fid,
+        mid = item.mid,
+        browseId = browseId,
+        playlistId = playlistId
+    )
+}
 
 /** 根据 UsageEntry 分发到不同平台详情 */
 private fun openRecent(

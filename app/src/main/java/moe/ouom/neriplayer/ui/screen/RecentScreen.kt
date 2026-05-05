@@ -126,29 +126,7 @@ fun RecentScreen(
     val history by repo.historyFlow.collectAsState()
 
     // 可播放的 SongItem 列表
-    val baseSongs: List<SongItem> = remember(history) {
-        history.map {
-            SongItem(
-                id = it.id, name = it.name, artist = it.artist, albumId = it.albumId,
-                album = it.album,
-                durationMs = it.durationMs,
-                coverUrl = it.coverUrl,
-                mediaUri = it.localFilePath ?: it.mediaUri,
-                matchedLyric = it.matchedLyric,
-                matchedTranslatedLyric = it.matchedTranslatedLyric,
-                customCoverUrl = it.customCoverUrl,
-                customName = it.customName,
-                customArtist = it.customArtist,
-                originalName = it.originalName,
-                originalArtist = it.originalArtist,
-                originalCoverUrl = it.originalCoverUrl,
-                originalLyric = it.originalLyric,
-                originalTranslatedLyric = it.originalTranslatedLyric,
-                localFileName = it.localFileName,
-                localFilePath = it.localFilePath
-            )
-        }
-    }
+    val baseSongs: List<SongItem> = remember(history) { history.toSongItems() }
 
     val context = LocalContext.current
     val mini = LocalMiniPlayerHeight.current
@@ -678,4 +656,3 @@ private fun PlayingIndicator(color: Color, animate: Boolean) {
         )
     }
 }
-

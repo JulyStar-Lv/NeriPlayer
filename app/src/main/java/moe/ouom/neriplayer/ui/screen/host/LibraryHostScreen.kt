@@ -87,8 +87,7 @@ sealed class LibrarySelectedItem : Parcelable {
 @Composable
 fun LibraryHostScreen(
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
-    onPlayParts: (BiliClient.VideoBasicInfo, Int, String) -> Unit = { _, _, _ -> },
-    onOpenRecent: () -> Unit
+    onPlayParts: (BiliClient.VideoBasicInfo, Int, String) -> Unit = { _, _, _ -> }
 ) {
     var selected by rememberSaveable(stateSaver = librarySelectedItemSaver) {
         mutableStateOf(null)
@@ -107,7 +106,6 @@ fun LibraryHostScreen(
     // 保存各个列表的滚动状态
     val localListSaver: Saver<LazyListState, *> = LazyListState.Saver
     val favoriteListSaver: Saver<LazyListState, *> = LazyListState.Saver
-    val neteaseAlbumSaver: Saver<LazyListState, *> = LazyListState.Saver
     val neteaseListSaver: Saver<LazyListState, *> = LazyListState.Saver
     val youtubeMusicListSaver: Saver<LazyListState, *> = LazyListState.Saver
     val biliListSaver: Saver<LazyListState, *> = LazyListState.Saver
@@ -120,9 +118,6 @@ fun LibraryHostScreen(
         LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 0)
     }
     val neteaseListState = rememberSaveable(saver = neteaseListSaver) {
-        LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 0)
-    }
-    val neteaseAlbumState = rememberSaveable(saver = neteaseAlbumSaver) {
         LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 0)
     }
     val youtubeMusicListState = rememberSaveable(saver = youtubeMusicListSaver) {
@@ -157,7 +152,6 @@ fun LibraryHostScreen(
                         onTabChange = { selectedTab = it },
                         localListState = localListState,
                         favoriteListState = favoriteListState,
-                        neteaseAlbumState = neteaseAlbumState,
                         neteaseListState = neteaseListState,
                         youtubeMusicListState = youtubeMusicListState,
                         biliListState = biliListState,
@@ -215,8 +209,7 @@ fun LibraryHostScreen(
                                 mid = playlist.mid,
                                 fid = playlist.fid
                             )
-                        },
-                        onOpenRecent = onOpenRecent
+                        }
                     )
                 }
             } else {

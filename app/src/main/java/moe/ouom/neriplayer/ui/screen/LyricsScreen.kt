@@ -23,19 +23,18 @@ package moe.ouom.neriplayer.ui.screen
  * Created: 2025/8/13
  */
 
-import android.annotation.SuppressLint
 import android.content.ClipData
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -49,33 +48,30 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
-import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.SpeakerGroup
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.SkipNext
-import androidx.compose.material.icons.outlined.SkipPrevious
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -93,12 +89,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -124,6 +120,7 @@ import moe.ouom.neriplayer.ui.component.LyricEntry
 import moe.ouom.neriplayer.ui.component.LocalSongDetailsDialog
 import moe.ouom.neriplayer.ui.component.LocalSongSyncConfirmDialog
 import moe.ouom.neriplayer.ui.component.LyricVisualSpec
+import moe.ouom.neriplayer.ui.component.SleepTimerDialog
 import moe.ouom.neriplayer.ui.component.WaveformSlider
 import moe.ouom.neriplayer.ui.component.bottomSheetScrollGuard
 import moe.ouom.neriplayer.ui.viewmodel.tab.AlbumSummary
@@ -146,6 +143,7 @@ fun LyricsScreen(
     onLyricFontScaleChange: (Float) -> Unit,
     onEnterAlbum: (AlbumSummary) -> Unit,
     onNavigateBack: () -> Unit,
+    onCollapse: () -> Unit = onNavigateBack,
     onSeekTo: (Long) -> Unit,
     advancedLyricsEnabled: Boolean = true,
     translatedLyrics: List<LyricEntry>? = null,
@@ -161,6 +159,7 @@ fun LyricsScreen(
     val isPlaying by PlayerManager.isPlayingFlow.collectAsState()
     val isPlaybackControlPlaying by PlayerManager.playbackControlPlayingFlow.collectAsState()
     val lyricsPlaybackSoundState by PlayerManager.playbackSoundStateFlow.collectAsState()
+    val currentPlaybackAudioInfo by PlayerManager.currentPlaybackAudioInfoFlow.collectAsState()
     val plainLyrics = remember(lyrics) { lyrics.flattenWordTimedEntries() }
     val plainTranslatedLyrics = remember(translatedLyrics) {
         translatedLyrics.orEmpty().flattenWordTimedEntries()
@@ -168,6 +167,10 @@ fun LyricsScreen(
     val durationMs = currentSong?.durationMs ?: 0L
     val favoriteActionLabel = stringResource(R.string.favorite_add)
     val playlistAddActionLabel = stringResource(R.string.playlist_add_to)
+    val topActionButtonSize = 52.dp
+    val topActionIconSize = 28.dp
+    val toolbarButtonSize = 52.dp
+    val toolbarIconSize = 28.dp
 
     val context = LocalContext.current
     val currentCoverUrl = remember(currentSong, context) {
@@ -178,17 +181,18 @@ fun LyricsScreen(
 
     var showSongNameMenu by remember { mutableStateOf(false) }
     var showArtistMenu by remember { mutableStateOf(false) }
+    var showMoreOptions by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(false) }
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showQualitySwitchDialog by remember { mutableStateOf(false) }
     var detailSong by remember { mutableStateOf<SongItem?>(null) }
     var pendingSyncConfirmAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingSyncConfirmLabel by remember { mutableStateOf("") }
 
-    // 动画状态
-    var isLyricsMode by remember { mutableStateOf(false) }
     var previewPositionOverrideMs by remember(currentSong?.id) { mutableStateOf<Long?>(null) }
 
-    // 启动进入动画
-    LaunchedEffect(Unit) {
-        isLyricsMode = true
+    LaunchedEffect(currentSong?.id) {
+        showQualitySwitchDialog = false
     }
 
     fun launchWithLocalSyncWarning(
@@ -205,18 +209,20 @@ fun LyricsScreen(
         }
     }
 
-    // 封面动画
-    val coverScale by animateFloatAsState(
-        targetValue = if (isLyricsMode) 0.6f else 1f,
-        animationSpec = spring(dampingRatio = 0.8f),
-        label = "cover_scale"
-    )
-    // 垂直偏移控制在标题栏内（约-8dp），避免飞出界面
-    val coverOffsetY by animateFloatAsState(
-        targetValue = if (isLyricsMode) -8f else 0f,
-        animationSpec = spring(dampingRatio = 0.8f),
-        label = "cover_offset_y"
-    )
+    val playlists by PlayerManager.playlistsFlow.collectAsState()
+    val isFavoriteComputed = remember(currentSong, playlists) {
+        val song = currentSong
+        if (song == null) {
+            false
+        } else {
+            val fav = playlists.firstOrNull { FavoritesPlaylist.isSystemPlaylist(it, context) }
+            fav?.songs?.any { it.sameIdentityAs(song) } == true
+        }
+    }
+    var favOverride by remember(currentSong) { mutableStateOf<Boolean?>(null) }
+    val isFavorite = favOverride ?: isFavoriteComputed
+
+    val headerCoverSize = 44.dp
 
     // 播放控件动画 - 轻微上浮/下沉，保持常驻在安全区域内
 
@@ -236,7 +242,7 @@ fun LyricsScreen(
             }
             .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        // 顶部区域 - 包含缩小的封面 + 收藏 + 更多
+        // 顶部区域 - 包含缩小的封面和歌曲信息
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -244,28 +250,31 @@ fun LyricsScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start
         ) {
-            HapticIconButton(onClick = onNavigateBack) {
+            HapticIconButton(onClick = onCollapse) {
                 Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.cd_back))
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // 封面 - 紧邻返回键，缩小时约48dp
+            // 封面 - 使用稳定的小尺寸目标，避免 shared transition 叠加自身缩放动画
             Box(
                 modifier = Modifier
-                    .size((64 * coverScale).dp)
+                    .size(headerCoverSize)
                     .then(
                         if (sharedTransitionScope != null && animatedContentScope != null) {
                             with(sharedTransitionScope) {
                                 Modifier.sharedElement(
                                     rememberSharedContentState(key = "cover_image"),
-                                    animatedVisibilityScope = animatedContentScope
+                                    animatedVisibilityScope = animatedContentScope,
+                                    clipInOverlayDuringTransition = OverlayClip(
+                                        PlayerCoverArtworkShape
+                                    )
                                 )
                             }
                         } else Modifier
                     )
-                    .graphicsLayer { translationY = coverOffsetY }
-                    .clip(RoundedCornerShape(10.dp))
+                    .offset(y = 2.dp)
+                    .clip(PlayerCoverArtworkShape)
             ) {
                 currentCoverUrl?.let { cover ->
                     AsyncImage(
@@ -291,18 +300,21 @@ fun LyricsScreen(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.Start
             ) {
-                Box {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = currentSong?.displayName() ?: stringResource(R.string.lyrics_unknown_song),
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(6.dp))
                             .combinedClickable(
                                 onClick = {},
                                 onLongClick = { showSongNameMenu = true }
                             )
+                            .basicMarquee(iterations = Int.MAX_VALUE)
                     )
                     DropdownMenu(
                         expanded = showSongNameMenu,
@@ -321,29 +333,22 @@ fun LyricsScreen(
                         )
                     }
                 }
-                Box {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = currentSong?.displayArtist() ?: stringResource(R.string.lyrics_unknown_artist),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
                         modifier = Modifier
-                            .then(
-                                if (sharedTransitionScope != null && animatedContentScope != null) {
-                                    with(sharedTransitionScope) {
-                                        Modifier.sharedElement(
-                                            rememberSharedContentState(key = "song_artist"),
-                                            animatedVisibilityScope = animatedContentScope
-                                        )
-                                    }
-                                } else Modifier
-                            )
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(6.dp))
                             .combinedClickable(
                                 onClick = {},
                                 onLongClick = { showArtistMenu = true }
                             )
+                            .basicMarquee(iterations = Int.MAX_VALUE)
                     )
                     DropdownMenu(
                         expanded = showArtistMenu,
@@ -364,69 +369,12 @@ fun LyricsScreen(
                 }
             }
 
-            // 收藏按钮（与 NowPlaying 保持一致的逻辑）
-            val playlists by PlayerManager.playlistsFlow.collectAsState()
-            val isFavoriteComputed = remember(currentSong, playlists) {
-                val song = currentSong
-                if (song == null) {
-                    false
-                } else {
-                    val fav = playlists.firstOrNull { FavoritesPlaylist.isSystemPlaylist(it, context) }
-                    fav?.songs?.any { it.sameIdentityAs(song) } == true
-                }
-            }
-            var favOverride by remember(currentSong) { mutableStateOf<Boolean?>(null) }
-            val isFavorite = favOverride ?: isFavoriteComputed
+            Spacer(modifier = Modifier.width(8.dp))
 
-            HapticIconButton(
-                onClick = {
-                    if (currentSong == null) return@HapticIconButton
-                    val willFav = !isFavorite
-                    launchWithLocalSyncWarning(
-                        song = currentSong,
-                        actionLabel = favoriteActionLabel,
-                        warnForLocalSync = willFav
-                    ) {
-                        favOverride = willFav
-                        if (willFav) {
-                            PlayerManager.addCurrentToFavorites()
-                        } else {
-                            PlayerManager.removeCurrentFromFavorites()
-                        }
-                    }
-                },
-                modifier = Modifier.size(48.dp)
-                    .then(
-                        if (sharedTransitionScope != null && animatedContentScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedBounds(
-                                    rememberSharedContentState(key = "btn_favorite"),
-                                    animatedVisibilityScope = animatedContentScope,
-                                    enter = EnterTransition.None,
-                                    exit = ExitTransition.None,
-                                ).zIndex(1f)
-                            }
-                        } else Modifier
-                    )
-            ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = if (isFavorite) stringResource(R.string.lyrics_favorited) else stringResource(R.string.lyrics_favorite),
-                    tint = if (isFavorite) {
-                        Color.Red.copy(alpha = 0.6f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            // 更多按钮
-            var showMoreOptions by remember { mutableStateOf(false) }
             HapticIconButton(
                 onClick = { showMoreOptions = true },
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier
+                    .size(topActionButtonSize)
                     .then(
                         if (sharedTransitionScope != null && animatedContentScope != null) {
                             with(sharedTransitionScope) {
@@ -440,28 +388,37 @@ fun LyricsScreen(
                         } else Modifier
                     )
             ) {
-                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.lyrics_more_options))
-            }
-            if (showMoreOptions && currentSong != null) {
-                val queue by PlayerManager.currentQueueFlow.collectAsState()
-                val displayedQueue = remember(queue) { queue }
-                val nowPlayingViewModel: moe.ouom.neriplayer.ui.viewmodel.NowPlayingViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-                val snackbarHostState = remember { SnackbarHostState() }
-                MoreOptionsSheet(
-                    viewModel = nowPlayingViewModel,
-                    originalSong = currentSong!!,
-                    queue = displayedQueue,
-                    displayedLyrics = lyrics,
-                    displayedTranslatedLyrics = translatedLyrics.orEmpty(),
-                    onDismiss = { showMoreOptions = false },
-                    onShowSongDetails = { detailSong = it },
-                    onEnterAlbum = onEnterAlbum,
-                    onNavigateUp = onNavigateBack,
-                    snackbarHostState = snackbarHostState,
-                    lyricFontScale = lyricFontScale,
-                    onLyricFontScaleChange = onLyricFontScaleChange
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = stringResource(R.string.lyrics_more_options),
+                    modifier = Modifier.size(topActionIconSize)
                 )
             }
+        }
+
+        if (showMoreOptions && currentSong != null) {
+            val queue by PlayerManager.currentQueueFlow.collectAsState()
+            val displayedQueue = remember(queue) { queue }
+            val nowPlayingViewModel: moe.ouom.neriplayer.ui.viewmodel.NowPlayingViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+            val snackbarHostState = remember { SnackbarHostState() }
+            MoreOptionsSheet(
+                viewModel = nowPlayingViewModel,
+                originalSong = currentSong!!,
+                queue = displayedQueue,
+                displayedLyrics = lyrics,
+                displayedTranslatedLyrics = translatedLyrics.orEmpty(),
+                onDismiss = { showMoreOptions = false },
+                onShowSongDetails = { detailSong = it },
+                onEnterAlbum = onEnterAlbum,
+                onNavigateUp = onCollapse,
+                snackbarHostState = snackbarHostState,
+                lyricFontScale = lyricFontScale,
+                onLyricFontScaleChange = onLyricFontScaleChange,
+                currentPlaybackAudioInfo = currentPlaybackAudioInfo,
+                onShowQualitySwitch = { showQualitySwitchDialog = true },
+                onShowSleepTimer = { showSleepTimerDialog = true },
+                onShowAddToPlaylist = { showAddSheet = true }
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -491,67 +448,106 @@ fun LyricsScreen(
             )
         }
 
-        // 底部控件 - 使用共享元素动画
+        // 底部控件：保留进度条，操作栏左侧放歌词和收藏，右侧放播放/暂停。
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .padding(vertical = 10.dp)
         ) {
-            // 进度条
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (sharedTransitionScope != null && animatedContentScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedBounds(
-                                    rememberSharedContentState(key = "progress_bar"),
-                                    animatedVisibilityScope = animatedContentScope
-                                ).zIndex(1f)
-                            }
-                        } else Modifier
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                LyricsProgressSection(
-                    songKey = currentSong?.stableKey(),
-                    durationMs = durationMs,
-                    isPlaying = isPlaying,
-                    onSeekTo = onSeekTo,
-                    onPreviewPositionChange = { previewPositionOverrideMs = it },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 播放控制按钮
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .padding(horizontal = 4.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HapticIconButton(onClick = { PlayerManager.previous() },
-                    modifier = Modifier
-                    .then(
-                        if (sharedTransitionScope != null && animatedContentScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedElement(
-                                    rememberSharedContentState(key = "player_previous"),
-                                    animatedVisibilityScope = animatedContentScope
-                                )
-                            }
-                        } else Modifier
-                    )
-                    .size(42.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Outlined.SkipPrevious,
-                        contentDescription = stringResource(R.string.lyrics_previous),
-                        modifier = Modifier.size(32.dp)
-                    )
+                    HapticIconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .then(
+                                if (sharedTransitionScope != null && animatedContentScope != null) {
+                                    with(sharedTransitionScope) {
+                                        Modifier.sharedBounds(
+                                            rememberSharedContentState(key = "btn_lyrics"),
+                                            animatedVisibilityScope = animatedContentScope,
+                                            enter = EnterTransition.None,
+                                            exit = ExitTransition.None,
+                                        ).zIndex(1f)
+                                    }
+                                } else Modifier
+                            )
+                            .size(toolbarButtonSize)
+                    ) {
+                        AnimatedContent(
+                            targetState = true,
+                            label = "lyrics_icon"
+                        ) { isShowingLyrics ->
+                            Icon(
+                                painter = painterResource(R.drawable.ic_lyrics_bubble_quote),
+                                contentDescription = stringResource(R.string.lyrics_back_to_cover),
+                                tint = if (lyrics.isEmpty()) {
+                                    LocalContentColor.current.copy(alpha = 0.38f)
+                                } else if (isShowingLyrics) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    LocalContentColor.current
+                                },
+                                modifier = Modifier.size(toolbarIconSize)
+                            )
+                        }
+                    }
+
+                    HapticIconButton(
+                        onClick = {
+                            if (currentSong == null) return@HapticIconButton
+                            val willFav = !isFavorite
+                            launchWithLocalSyncWarning(
+                                song = currentSong,
+                                actionLabel = favoriteActionLabel,
+                                warnForLocalSync = willFav
+                            ) {
+                                if (willFav) {
+                                    PlayerManager.addCurrentToFavorites()
+                                } else {
+                                    PlayerManager.removeCurrentFromFavorites()
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .then(
+                                if (sharedTransitionScope != null && animatedContentScope != null) {
+                                    with(sharedTransitionScope) {
+                                        Modifier.sharedBounds(
+                                            rememberSharedContentState(key = "btn_favorite"),
+                                            animatedVisibilityScope = animatedContentScope,
+                                            enter = EnterTransition.None,
+                                            exit = ExitTransition.None,
+                                        ).zIndex(1f)
+                                    }
+                                } else Modifier
+                            )
+                            .size(toolbarButtonSize)
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = if (isFavorite) {
+                                stringResource(R.string.lyrics_favorited)
+                            } else {
+                                stringResource(R.string.lyrics_favorite)
+                            },
+                            tint = if (isFavorite) {
+                                Color.Red.copy(alpha = 0.72f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.size(toolbarIconSize)
+                        )
+                    }
                 }
 
                 HapticFilledIconButton(
@@ -567,7 +563,7 @@ fun LyricsScreen(
                                 }
                             } else Modifier
                         )
-                        .size(42.dp)
+                        .size(toolbarButtonSize)
                 ) {
                     AnimatedContent(
                         targetState = isPlaybackControlPlaying,
@@ -576,326 +572,64 @@ fun LyricsScreen(
                     ) { currentlyPlaying ->
                         Icon(
                             imageVector = if (currentlyPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                            contentDescription = if (currentlyPlaying) stringResource(R.string.lyrics_pause) else stringResource(R.string.lyrics_play)
+                            contentDescription = if (currentlyPlaying) stringResource(R.string.lyrics_pause) else stringResource(R.string.lyrics_play),
+                            modifier = Modifier.size(toolbarIconSize)
                         )
                     }
                 }
-
-                HapticIconButton(onClick = { PlayerManager.next() },
-                    modifier = Modifier
-                        .then(
-                            if (sharedTransitionScope != null && animatedContentScope != null) {
-                                with(sharedTransitionScope) {
-                                    Modifier.sharedElement(
-                                        rememberSharedContentState(key = "player_next"),
-                                        animatedVisibilityScope = animatedContentScope
-                                    )
-                                }
-                            } else Modifier
-                        )
-                        .size(42.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.SkipNext,
-                        contentDescription = stringResource(R.string.lyrics_next),
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // 底部操作栏（固定在底部，与 NowPlayingScreen 完全一致）
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 播放队列按钮
-            var showQueueSheet by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showQueueSheet = true },  modifier = Modifier.then(
-                if (sharedTransitionScope != null && animatedContentScope != null) {
-                    with(sharedTransitionScope) {
-                        Modifier.sharedBounds(
-                            rememberSharedContentState(key = "btn_queue"),
-                            animatedVisibilityScope = animatedContentScope,
-                            enter = EnterTransition.None,
-                            exit = ExitTransition.None,
-                        ).zIndex(1f)
-                    }
-                } else Modifier
-            )) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.QueueMusic,
-                    contentDescription = stringResource(R.string.lyrics_playlist),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // 定时器按钮
-            val sleepTimerState by PlayerManager.sleepTimerManager.timerState.collectAsState()
-            var showSleepTimerDialog by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showSleepTimerDialog = true },
-                modifier = Modifier.then(
-                    if (sharedTransitionScope != null && animatedContentScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier.sharedBounds(
-                                rememberSharedContentState(key = "btn_timer"),
-                                animatedVisibilityScope = animatedContentScope,
-                                enter = EnterTransition.None,
-                                exit = ExitTransition.None,
-                            ).zIndex(1f)
-                        }
-                    } else Modifier
-                )) {
-                Icon(
-                    Icons.Outlined.Timer,
-                    contentDescription = stringResource(R.string.lyrics_timer),
-                    tint = if (sleepTimerState.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // 音量按钮（根据设备显示不同图标，居中）
-            val context = LocalContext.current
-            val audioManager = remember { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
-            val devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-            val audioDeviceIcon = remember(devices) {
-                when {
-                    devices.any { it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP } -> Icons.Default.Headset
-                    devices.any { it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET || it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES } -> Icons.Default.Headset
-                    else -> Icons.Default.SpeakerGroup
+        if (showQualitySwitchDialog && currentPlaybackAudioInfo != null) {
+            NowPlayingQualityOptionsDialog(
+                title = stringResource(R.string.nowplaying_quality_switch_title),
+                selectedKey = currentPlaybackAudioInfo?.qualityKey,
+                options = currentPlaybackAudioInfo?.qualityOptions.orEmpty(),
+                onDismiss = { showQualitySwitchDialog = false },
+                onSelect = { option ->
+                    PlayerManager.changeCurrentPlaybackQuality(option.key)
+                    showQualitySwitchDialog = false
                 }
+            )
+        }
+
+        if (showSleepTimerDialog) {
+            SleepTimerDialog(
+                onDismiss = { showSleepTimerDialog = false }
+            )
+        }
+
+        if (showAddSheet && currentSong != null) {
+            val selectablePlaylists = remember(playlists, context) {
+                playlists.filterNot { LocalFilesPlaylist.isSystemPlaylist(it, context) }
             }
-            var showVolumeSheet by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showVolumeSheet = true },
-                modifier = Modifier.then(
-                    if (sharedTransitionScope != null && animatedContentScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier.sharedBounds(
-                                rememberSharedContentState(key = "btn_volume"),
-                                animatedVisibilityScope = animatedContentScope,
-                                enter = EnterTransition.None,
-                                exit = ExitTransition.None,
-                            ).zIndex(1f)
-                        }
-                    } else Modifier
-                )) {
-                Icon(
-                    audioDeviceIcon,
-                    contentDescription = stringResource(R.string.cd_audio_device),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // 歌词按钮（返回封面页，高亮显示）
-            @SuppressLint("UnusedContentLambdaTargetStateParameter")
-            HapticIconButton(onClick = onNavigateBack,
-                modifier = Modifier.then(
-                if (sharedTransitionScope != null && animatedContentScope != null) {
-                    with(sharedTransitionScope) {
-                        Modifier.sharedBounds(
-                            rememberSharedContentState(key = "btn_lyrics"),
-                            animatedVisibilityScope = animatedContentScope,
-                            enter = EnterTransition.None,
-                            exit = ExitTransition.None,
-                        ).zIndex(1f)
-                    }
-                } else Modifier
-            )) {
-                AnimatedContent(
-                    targetState = true,
-                    transitionSpec = {
-                        (scaleIn() + fadeIn()) togetherWith (scaleOut() + fadeOut())
-                    },
-                    label = "lyrics_icon"
-                ) { _ ->
-                    Icon(
-                        imageVector = Icons.Outlined.LibraryMusic,
-                        contentDescription = stringResource(R.string.lyrics_back_to_cover),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            // 添加到歌单按钮
-            var showAddSheet by remember { mutableStateOf(false) }
-            HapticIconButton(onClick = { showAddSheet = true },
-                modifier = Modifier.then(
-                if (sharedTransitionScope != null && animatedContentScope != null) {
-                    with(sharedTransitionScope) {
-                        Modifier.sharedBounds(
-                            rememberSharedContentState(key = "btn_add"),
-                            animatedVisibilityScope = animatedContentScope,
-                            enter = EnterTransition.None,
-                            exit = ExitTransition.None,
-                        ).zIndex(1f)
-                    }
-                } else Modifier
-            )) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.PlaylistAdd,
-                    contentDescription = stringResource(R.string.lyrics_add_to_playlist),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // 定时器对话框
-            if (showSleepTimerDialog) {
-                moe.ouom.neriplayer.ui.component.SleepTimerDialog(
-                    onDismiss = { showSleepTimerDialog = false }
-                )
-            }
-
-            // 音量控制弹窗
-            if (showVolumeSheet) {
-                androidx.compose.material3.ModalBottomSheet(
-                    onDismissRequest = { showVolumeSheet = false },
-                    sheetGesturesEnabled = false
-                ) {
-                    VolumeControlSheetContent()
-                }
-            }
-
-            // 播放队列弹窗
-            if (showQueueSheet) {
-                val queue by PlayerManager.currentQueueFlow.collectAsState()
-                val displayedQueue = remember(queue) { queue }
-                val currentIndexInDisplay = displayedQueue.indexOfFirst {
-                    it.id == currentSong?.id && it.album == currentSong?.album
-                }
-                val initialIndex = (currentIndexInDisplay - 4).coerceAtLeast(0)
-                val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
-
-                LaunchedEffect(showQueueSheet, currentIndexInDisplay) {
-                    if (showQueueSheet && currentIndexInDisplay >= 0) {
-                        kotlinx.coroutines.delay(150)
-                        listState.animateScrollToItem(currentIndexInDisplay)
-                    }
-                }
-
-                androidx.compose.material3.ModalBottomSheet(
-                    onDismissRequest = { showQueueSheet = false },
-                    sheetGesturesEnabled = false
-                ) {
-                    androidx.compose.foundation.lazy.LazyColumn(
-                        state = listState,
-                        modifier = Modifier.bottomSheetScrollGuard()
-                    ) {
-                        itemsIndexed(displayedQueue) { index, song ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        PlayerManager.playFromQueue(index)
-                                        showQueueSheet = false
-                                    }
-                                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${index + 1}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.width(48.dp),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Start,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(song.displayName(), maxLines = 1)
-                                    Text(
-                                        song.displayArtist(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1
-                                    )
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    if (index == currentIndexInDisplay) {
-                                        Icon(
-                                            Icons.Outlined.PlayArrow,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-
-                                    var showMoreMenu by remember { mutableStateOf(false) }
-                                    Box {
-                                        androidx.compose.material3.IconButton(onClick = { showMoreMenu = true }) {
-                                            Icon(
-                                                Icons.Filled.MoreVert,
-                                                contentDescription = stringResource(R.string.common_more_actions),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-
-                                        DropdownMenu(
-                                            expanded = showMoreMenu,
-                                            onDismissRequest = { showMoreMenu = false }
-                                        ) {
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.local_playlist_play_next)) },
-                                                onClick = {
-                                                    PlayerManager.addToQueueNext(song)
-                                                    showMoreMenu = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.playlist_add_to_end)) },
-                                                onClick = {
-                                                    PlayerManager.addToQueueEnd(song)
-                                                    showMoreMenu = false
-                                                }
-                                            )
-                                        }
+            ModalBottomSheet(
+                onDismissRequest = { showAddSheet = false },
+                sheetGesturesEnabled = false
+            ) {
+                LazyColumn(modifier = Modifier.bottomSheetScrollGuard()) {
+                    itemsIndexed(
+                        items = selectablePlaylists,
+                        key = { _, pl -> pl.id },
+                        contentType = { _, _ -> "playlist_option" }
+                    ) { _, pl ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    launchWithLocalSyncWarning(
+                                        song = currentSong,
+                                        actionLabel = playlistAddActionLabel
+                                    ) {
+                                        PlayerManager.addCurrentToPlaylist(pl.id)
+                                        showAddSheet = false
                                     }
                                 }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                        }
-                    }
-                }
-            }
-
-            // 添加到歌单弹窗
-            if (showAddSheet && currentSong != null) {
-                val playlists by PlayerManager.playlistsFlow.collectAsState()
-                val selectablePlaylists = remember(playlists, context) {
-                    playlists.filterNot { LocalFilesPlaylist.isSystemPlaylist(it, context) }
-                }
-                androidx.compose.material3.ModalBottomSheet(
-                    onDismissRequest = { showAddSheet = false },
-                    sheetGesturesEnabled = false
-                ) {
-                    androidx.compose.foundation.lazy.LazyColumn(
-                        modifier = Modifier.bottomSheetScrollGuard()
-                    ) {
-                        itemsIndexed(selectablePlaylists) { _, pl ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        launchWithLocalSyncWarning(
-                                            song = currentSong,
-                                            actionLabel = playlistAddActionLabel
-                                        ) {
-                                            PlayerManager.addCurrentToPlaylist(pl.id)
-                                            showAddSheet = false
-                                        }
-                                    }
-                                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(pl.name, style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.weight(1f))
+                                .padding(horizontal = 24.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(pl.name, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.weight(1f))
                             Text(
                                 pluralStringResource(
                                     R.plurals.lyrics_song_count,
@@ -904,11 +638,10 @@ fun LyricsScreen(
                                 ),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
                 }
+                Spacer(Modifier.height(12.dp))
             }
         }
 
@@ -1118,4 +851,3 @@ private fun LyricsProgressSection(
         )
     }
 }
-

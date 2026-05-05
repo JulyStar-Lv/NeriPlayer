@@ -489,6 +489,11 @@ private suspend fun PlayerManager.getNeteaseSongUrl(
         previewFallback?.let { return@withContext it }
 
         if (!suppressError) {
+            val suppressibleHint = when (lastFailureReason) {
+                NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION ->
+                    PlayerEvent.SuppressibleHint.NETEASE_NO_PERMISSION
+                else -> null
+            }
             val messageRes = when (lastFailureReason) {
                 NeteasePlaybackResponseParser.FailureReason.NO_PERMISSION ->
                     R.string.player_netease_no_permission_switch_platform
@@ -496,7 +501,12 @@ private suspend fun PlayerManager.getNeteaseSongUrl(
                 NeteasePlaybackResponseParser.FailureReason.UNKNOWN,
                 null -> R.string.error_no_play_url
             }
-            postPlayerEvent(PlayerEvent.ShowError(getLocalizedString(messageRes)))
+            postPlayerEvent(
+                PlayerEvent.ShowError(
+                    message = getLocalizedString(messageRes),
+                    suppressibleHint = suppressibleHint
+                )
+            )
         }
         SongUrlResult.Failure
     } catch (e: Exception) {

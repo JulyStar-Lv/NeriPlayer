@@ -80,6 +80,9 @@ class SettingsRepository(private val context: Context) {
     val silentGitHubSyncFailureFlow: Flow<Boolean> =
         context.dataStore.data.map { it[SettingsKeys.SILENT_GITHUB_SYNC_FAILURE] ?: false }
 
+    val suppressNeteaseNoPermissionHintFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[SettingsKeys.SUPPRESS_NETEASE_NO_PERMISSION_HINT] ?: false }
+
     val audioQualityFlow: Flow<String> =
         context.dataStore.data.map { it[SettingsKeys.AUDIO_QUALITY] ?: "exhigh" }
 
@@ -212,6 +215,9 @@ class SettingsRepository(private val context: Context) {
     val homeCardContinueFlow: Flow<Boolean> =
         context.dataStore.data.map { it[SettingsKeys.HOME_CARD_CONTINUE] ?: true }
 
+    val homeCardRecentFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[SettingsKeys.HOME_CARD_RECENT] ?: true }
+
     val homeCardTrendingFlow: Flow<Boolean> =
         context.dataStore.data.map { it[SettingsKeys.HOME_CARD_TRENDING] ?: true }
 
@@ -329,6 +335,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setSilentGitHubSyncFailure(enabled: Boolean) {
         context.dataStore.edit { it[SettingsKeys.SILENT_GITHUB_SYNC_FAILURE] = enabled }
+    }
+
+    suspend fun setSuppressNeteaseNoPermissionHint(enabled: Boolean) {
+        context.dataStore.edit { it[SettingsKeys.SUPPRESS_NETEASE_NO_PERMISSION_HINT] = enabled }
     }
 
     suspend fun setDisclaimerAccepted(accepted: Boolean) {
@@ -564,6 +574,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setHomeCardContinue(enabled: Boolean) {
         context.dataStore.edit { it[SettingsKeys.HOME_CARD_CONTINUE] = enabled }
+    }
+
+    suspend fun setHomeCardRecent(enabled: Boolean) {
+        context.dataStore.edit { it[SettingsKeys.HOME_CARD_RECENT] = enabled }
     }
 
     suspend fun setHomeCardTrending(enabled: Boolean) {

@@ -26,5 +26,12 @@ package moe.ouom.neriplayer.core.player.model
 /** 用于封装播放器需要通知 UI 的事件 */
 sealed class PlayerEvent {
     data class ShowLoginPrompt(val message: String) : PlayerEvent()
-    data class ShowError(val message: String) : PlayerEvent()
+    data class ShowError(
+        val message: String,
+        val suppressibleHint: SuppressibleHint? = null
+    ) : PlayerEvent()
+
+    enum class SuppressibleHint {
+        NETEASE_NO_PERMISSION
+    }
 }

@@ -48,6 +48,8 @@ object SettingsKeys {
     val NOWPLAYING_PROGRESS_SHOW_AUDIO_SPEC =
         booleanPreferencesKey("nowplaying_progress_show_audio_spec")
     val SILENT_GITHUB_SYNC_FAILURE = booleanPreferencesKey("silent_github_sync_failure")
+    val SUPPRESS_NETEASE_NO_PERMISSION_HINT =
+        booleanPreferencesKey("suppress_netease_no_permission_hint")
     val DISCLAIMER_ACCEPTED_V2 = booleanPreferencesKey("disclaimer_accepted_v2")
     val STARTUP_ONBOARDING_COMPLETED = booleanPreferencesKey("startup_onboarding_completed")
     val AUDIO_QUALITY = stringPreferencesKey("audio_quality")
@@ -85,6 +87,7 @@ object SettingsKeys {
     val DEFAULT_START_DESTINATION = stringPreferencesKey("default_start_destination")
     val AUTO_SHOW_KEYBOARD = booleanPreferencesKey("auto_show_keyboard")
     val HOME_CARD_CONTINUE = booleanPreferencesKey("home_card_continue")
+    val HOME_CARD_RECENT = booleanPreferencesKey("home_card_recent")
     val HOME_CARD_TRENDING = booleanPreferencesKey("home_card_trending")
     val HOME_CARD_RADAR = booleanPreferencesKey("home_card_radar")
     val HOME_CARD_RECOMMENDED = booleanPreferencesKey("home_card_recommended")

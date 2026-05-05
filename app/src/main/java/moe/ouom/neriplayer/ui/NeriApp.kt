@@ -25,6 +25,8 @@ package moe.ouom.neriplayer.ui
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -72,6 +74,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -102,6 +105,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -285,6 +289,22 @@ private fun View.drawScaledThemeRevealBitmap(): Bitmap? {
             draw(canvas)
         }
     }.getOrNull()
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private fun updateStatusBarIconAppearance(
+    context: Context,
+    fallbackView: View,
+    useDarkIcons: Boolean
+) {
+    val activity = context.findActivity() ?: fallbackView.context.findActivity() ?: return
+    val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+    controller.isAppearanceLightStatusBars = useDarkIcons
 }
 
 private suspend fun captureThemeRevealSnapshot(
@@ -566,6 +586,7 @@ private fun NeriAppContent(
     val defaultStartDestination by repo.defaultStartDestinationFlow.collectAsState(initial = Destinations.Home.route)
     val autoShowKeyboard by repo.autoShowKeyboardFlow.collectAsState(initial = false)
     val showHomeContinueCard by repo.homeCardContinueFlow.collectAsState(initial = true)
+    val showHomeRecentCard by repo.homeCardRecentFlow.collectAsState(initial = true)
     val showHomeTrendingCard by repo.homeCardTrendingFlow.collectAsState(initial = true)
     val showHomeRadarCard by repo.homeCardRadarFlow.collectAsState(initial = true)
     val showHomeRecommendedCard by repo.homeCardRecommendedFlow.collectAsState(initial = true)
@@ -583,6 +604,7 @@ private fun NeriAppContent(
         initial = startupPlaybackPreferences.maxCacheSizeBytes
     )
     val homeUsageEntries by AppContainer.playlistUsageRepo.frequentPlaylistsFlow.collectAsState(initial = emptyList())
+    val homeRecentPlays by AppContainer.playHistoryRepo.historyFlow.collectAsState(initial = emptyList())
     var pendingFollowSystemDark by remember { mutableStateOf<Boolean?>(null) }
     var pendingForceDark by remember { mutableStateOf<Boolean?>(null) }
     var themeRevealSnapshot by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -802,6 +824,13 @@ private fun NeriAppContent(
         followSystemDark -> isSystemInDarkTheme()
         else -> false
     }
+    SideEffect {
+        updateStatusBarIconAppearance(
+            context = context,
+            fallbackView = rootView,
+            useDarkIcons = if (showNowPlaying) false else !isDark
+        )
+    }
     val hazeState = remember { HazeState() }
     val preferredQuality by repo.audioQualityFlow.collectAsState(initial = "exhigh")
     val youtubePreferredQuality by repo.youtubeAudioQualityFlow.collectAsState(initial = "very_high")
@@ -955,6 +984,7 @@ private fun NeriAppContent(
             val currentRoute = backEntry?.destination?.route
             val showHomeTab =
                 (showHomeContinueCard && homeUsageEntries.isNotEmpty()) ||
+                    (showHomeRecentCard && homeRecentPlays.isNotEmpty()) ||
                     showHomeTrendingCard ||
                     showHomeRadarCard ||
                     showHomeRecommendedCard
@@ -1158,9 +1188,11 @@ private fun NeriAppContent(
                                 ) {
                                     HomeHostScreen(
                                         showContinueCard = showHomeContinueCard,
+                                        showRecentCard = showHomeRecentCard,
                                         showTrendingCard = showHomeTrendingCard,
                                         showRadarCard = showHomeRadarCard,
                                         showRecommendedCard = showHomeRecommendedCard,
+                                        onOpenRecentScreen = { navController.navigate(Destinations.Recent.route) },
                                         onSongClick = ::playSongsAndOpenNowPlaying
                                     )
                                 }
@@ -1315,8 +1347,7 @@ private fun NeriAppContent(
                                 ) {
                                     LibraryHostScreen(
                                         onSongClick = ::playSongsAndOpenNowPlaying,
-                                        onPlayParts = ::playBiliPartsAndOpenNowPlaying,
-                                        onOpenRecent = { navController.navigate(Destinations.Recent.route) }
+                                        onPlayParts = ::playBiliPartsAndOpenNowPlaying
                                     )
                                 }
 
@@ -1593,6 +1624,10 @@ private fun NeriAppContent(
                                         onShowHomeContinueCardChange = { enabled ->
                                             scope.launch { repo.setHomeCardContinue(enabled) }
                                         },
+                                        showHomeRecentCard = showHomeRecentCard,
+                                        onShowHomeRecentCardChange = { enabled ->
+                                            scope.launch { repo.setHomeCardRecent(enabled) }
+                                        },
                                         showHomeTrendingCard = showHomeTrendingCard,
                                         onShowHomeTrendingCardChange = { enabled ->
                                             scope.launch { repo.setHomeCardTrending(enabled) }
@@ -1606,6 +1641,7 @@ private fun NeriAppContent(
                                             scope.launch { repo.setHomeCardRecommended(enabled) }
                                         },
                                         homeHasRecentUsage = homeUsageEntries.isNotEmpty(),
+                                        homeHasRecentPlays = homeRecentPlays.isNotEmpty(),
                                         playbackFadeIn = playbackFadeIn,
                                         onPlaybackFadeInChange = { enabled ->
                                             scope.launch { repo.setPlaybackFadeIn(enabled) }

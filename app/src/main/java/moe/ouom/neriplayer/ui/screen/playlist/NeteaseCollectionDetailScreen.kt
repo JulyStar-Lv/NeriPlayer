@@ -635,7 +635,7 @@ fun DetailScreen(
                                 else -> {
                                     itemsIndexed(
                                         displayedTracks,
-                                        key = { _, it -> it.id }) { index, item ->
+                                        key = { index, it -> "${it.id}:$index" }) { index, item ->
                                         SongRow(
                                             index = index + 1,
                                             song = item,
@@ -657,7 +657,12 @@ fun DetailScreen(
                                                     "tap song index=$index id=${item.id}"
                                                 )
                                                 val full = ui.tracks
-                                                val pos = full.indexOfFirst { it.id == item.id }
+                                                val pos = resolveTrackPosition(
+                                                    tracks = full,
+                                                    displayedTracks = displayedTracks,
+                                                    displayedIndex = index,
+                                                    item = item
+                                                )
                                                 if (pos >= 0) onSongClick(full, pos)
                                             },
                                             snackbarHostState = snackbarHostState
@@ -817,6 +822,33 @@ fun DetailScreen(
             onDismiss = { showDownloadManager = false }
         )
     }
+}
+
+private fun resolveTrackPosition(
+    tracks: List<SongItem>,
+    displayedTracks: List<SongItem>,
+    displayedIndex: Int,
+    item: SongItem
+): Int {
+    if (displayedTracks === tracks) {
+        return displayedIndex.takeIf { it in tracks.indices } ?: -1
+    }
+
+    val occurrence = displayedTracks
+        .take(displayedIndex + 1)
+        .count { it == item }
+        .coerceAtLeast(1)
+    var seen = 0
+    tracks.forEachIndexed { index, candidate ->
+        if (candidate == item) {
+            seen += 1
+            if (seen == occurrence) {
+                return index
+            }
+        }
+    }
+
+    return tracks.indexOfFirst { it.id == item.id }
 }
 
 /* 小组件 */
