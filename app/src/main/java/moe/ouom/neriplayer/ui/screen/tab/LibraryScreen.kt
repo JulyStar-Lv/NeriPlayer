@@ -56,9 +56,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -211,7 +213,9 @@ fun LibraryScreen(
     onNeteasePlaylistClick: (PlaylistSummary) -> Unit = {},
     onNeteaseAlbumClick: (AlbumSummary) -> Unit = {},
     onYouTubeMusicPlaylistClick: (YouTubeMusicPlaylist) -> Unit = {},
-    onBiliPlaylistClick: (BiliPlaylist) -> Unit = {}
+    onBiliPlaylistClick: (BiliPlaylist) -> Unit = {},
+    onOpenRecent: () -> Unit = {},
+    onOpenStats: () -> Unit = {}
 ) {
     val vm: LibraryViewModel = viewModel()
     val neteaseVm: NeteaseAuthViewModel = viewModel()
@@ -466,6 +470,18 @@ fun LibraryScreen(
                     scrolledContainerColor = Color.Transparent
                 ),
                 actions = {
+                    HapticIconButton(onClick = onOpenStats) {
+                        Icon(
+                            Icons.Filled.BarChart,
+                            contentDescription = stringResource(R.string.stats_title)
+                        )
+                    }
+                    HapticIconButton(onClick = onOpenRecent) {
+                        Icon(
+                            Icons.Outlined.History,
+                            contentDescription = stringResource(R.string.recent_title)
+                        )
+                    }
                     HapticIconButton(onClick = { showPlatformAccountPage = true }) {
                         Icon(
                             Icons.Filled.Add,
