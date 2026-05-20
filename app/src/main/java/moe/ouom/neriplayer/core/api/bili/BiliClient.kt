@@ -81,6 +81,7 @@ class BiliClient(
         private const val FAV_FOLDER_CREATED_LIST_ALL = "https://api.bilibili.com/x/v3/fav/folder/created/list-all"
         private const val FAV_FOLDER_INFO = "https://api.bilibili.com/x/v3/fav/folder/info"
         private const val FAV_RESOURCE_LIST = "https://api.bilibili.com/x/v3/fav/resource/list"
+        private const val SEASON_ARCHIVES_LIST = "https://api.bilibili.com/x/polymer/web-space/seasons_archives_list"
         private const val PAGELIST_URL = "https://api.bilibili.com/x/player/pagelist"
 
         /** 默认 UA（Web） */
@@ -312,6 +313,15 @@ class BiliClient(
         val info: FavFolder,
         val items: List<FavResourceItem>,
         val hasMore: Boolean
+    )
+
+    data class SeasonArchiveItem(
+        val aid: Long,
+        val bvid: String,
+        val title: String,
+        val coverUrl: String,
+        val durationSec: Int,
+        val author: String
     )
 
     // 对外 API //
@@ -697,6 +707,48 @@ class BiliClient(
         // 按页码从小到大排序，然后展开并合并列表
         pageResults.sortedBy { it.first }.flatMap { it.second }
     }
+
+    suspend fun getAllSeasonArchives(mid: Long, seasonId: Long): List<SeasonArchiveItem> =
+        withContext(Dispatchers.IO) {
+            if (mid == 0L || seasonId == 0L) return@withContext emptyList()
+
+            val pageSize = 30
+            var page = 1
+            val out = mutableListOf<SeasonArchiveItem>()
+
+            while (true) {
+                val jo = getJson(
+                    SEASON_ARCHIVES_LIST,
+                    mapOf(
+                        "mid" to mid.toString(),
+                        "season_id" to seasonId.toString(),
+                        "page_num" to page.toString(),
+                        "page_size" to pageSize.toString()
+                    )
+                )
+                val data = jo.optJSONObject("data") ?: break
+                val archives = data.optJSONArray("archives") ?: JSONArray()
+                for (i in 0 until archives.length()) {
+                    val o = archives.optJSONObject(i) ?: continue
+                    val aid = o.optLong("aid", 0L)
+                    val bvid = o.optString("bvid", "")
+                    if (aid == 0L || bvid.isBlank()) continue
+                    out += SeasonArchiveItem(
+                        aid = aid,
+                        bvid = bvid,
+                        title = o.optString("title"),
+                        coverUrl = ensureHttps(o.optString("pic")),
+                        durationSec = o.optInt("duration"),
+                        author = o.optJSONObject("author")?.optString("name").orEmpty()
+                    )
+                }
+
+                if (archives.length() < pageSize) break
+                page += 1
+            }
+
+            out
+        }
 
     // 内部实现 //
 
@@ -1126,7 +1178,11 @@ class BiliClient(
 
     private fun ensureHttps(url: String?): String {
         if (url.isNullOrBlank()) return ""
-        return if (url.startsWith("//")) "https:$url" else url
+        return when {
+            url.startsWith("//") -> "https:$url"
+            url.startsWith("http://") -> url.replaceFirst("http://", "https://")
+            else -> url
+        }
     }
 
     private fun stripHtml(html: String): String {

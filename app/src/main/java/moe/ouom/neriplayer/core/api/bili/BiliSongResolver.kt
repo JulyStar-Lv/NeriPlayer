@@ -42,6 +42,7 @@ fun buildBiliPartSong(
     coverUrl: String
 ): SongItem {
     val (title, artist) = parseBiliPartMetadata(page.part, basicInfo.ownerName)
+    val resolvedCoverUrl = coverUrl.ifBlank { basicInfo.coverUrl }
     return SongItem(
         id = basicInfo.aid,
         name = title,
@@ -49,7 +50,7 @@ fun buildBiliPartSong(
         album = "${PlayerManager.BILI_SOURCE_TAG}|${page.cid}",
         albumId = 0L,
         durationMs = page.durationSec * 1000L,
-        coverUrl = coverUrl,
+        coverUrl = resolvedCoverUrl,
         channelId = "bilibili",
         audioId = basicInfo.aid.toString(),
         subAudioId = page.cid.toString()

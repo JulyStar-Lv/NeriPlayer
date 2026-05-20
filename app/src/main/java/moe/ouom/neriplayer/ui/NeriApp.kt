@@ -1244,7 +1244,9 @@ private fun NeriAppContent(
                                         showRadarCard = showHomeRadarCard,
                                         showRecommendedCard = showHomeRecommendedCard,
                                         onOpenRecentScreen = { navController.navigate(Destinations.Recent.route) },
-                                        onSongClick = ::playSongsAndOpenNowPlaying
+                                        onSongClick = ::playSongsAndOpenNowPlaying,
+                                        onPlayBiliAudio = ::playBiliAudioAndOpenNowPlaying,
+                                        onPlayBiliParts = ::playBiliPartsAndOpenNowPlaying
                                     )
                                 }
 
@@ -1398,6 +1400,7 @@ private fun NeriAppContent(
                                 ) {
                                     LibraryHostScreen(
                                         onSongClick = ::playSongsAndOpenNowPlaying,
+                                        onPlayBiliAudio = ::playBiliAudioAndOpenNowPlaying,
                                         onPlayParts = ::playBiliPartsAndOpenNowPlaying,
                                         onOpenRecent = { navController.navigate(Destinations.Recent.route) },
                                         onOpenStats = { navController.navigate(Destinations.PlaybackStats.route) }

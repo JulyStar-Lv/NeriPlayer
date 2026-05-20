@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.CancellationException
+import moe.ouom.neriplayer.core.api.bili.BiliClient
 import moe.ouom.neriplayer.core.player.PlayerManager
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.data.platform.youtube.stableYouTubeMusicId
@@ -55,6 +56,7 @@ import moe.ouom.neriplayer.ui.screen.tab.HomePlaylistGridItem
 import moe.ouom.neriplayer.ui.screen.tab.HomePlaylistGridScreen
 import moe.ouom.neriplayer.ui.screen.tab.HomeScreen
 import moe.ouom.neriplayer.ui.screen.tab.HomeSongCollectionDetailScreen
+import moe.ouom.neriplayer.ui.viewmodel.playlist.BiliVideoItem
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 import moe.ouom.neriplayer.ui.viewmodel.tab.AlbumSummary
 import moe.ouom.neriplayer.ui.viewmodel.tab.BiliPlaylist
@@ -88,7 +90,13 @@ fun HomeHostScreen(
     showRadarCard: Boolean = true,
     showRecommendedCard: Boolean = true,
     onOpenRecentScreen: () -> Unit = {},
-    onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> }
+    onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
+    onPlayBiliAudio: (List<BiliVideoItem>, Int) -> Unit = { videos, index ->
+        PlayerManager.playBiliVideoAsAudio(videos, index)
+    },
+    onPlayBiliParts: (BiliClient.VideoBasicInfo, Int, String) -> Unit = { videoInfo, index, coverUrl ->
+        PlayerManager.playBiliVideoParts(videoInfo, index, coverUrl)
+    }
 ) {
     var selected by rememberSaveable(stateSaver = homeSelectedItemSaver) {
         mutableStateOf(null)
@@ -204,12 +212,8 @@ fun HomeHostScreen(
                         BiliPlaylistDetailScreen(
                             playlist = current.playlist,
                             onBack = { selected = null },
-                            onPlayAudio = { videos, index ->
-                                PlayerManager.playBiliVideoAsAudio(videos, index)
-                            },
-                            onPlayParts = { videoInfo, index, coverUrl ->
-                                PlayerManager.playBiliVideoParts(videoInfo, index, coverUrl)
-                            }
+                            onPlayAudio = onPlayBiliAudio,
+                            onPlayParts = onPlayBiliParts
                         )
                     }
                     is HomeSelectedItem.YouTubeMusic -> {

@@ -67,6 +67,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -180,6 +181,9 @@ fun BiliPlaylistDetailScreen(
             coverUrl = header.coverUrl,
             trackCount = header.count,
             source = playlistSource,
+            fid = header.fid,
+            mid = header.mid,
+            bvid = header.bvid,
             songs = ui.videos.map { it.toSongItem() }
         )
     }
@@ -197,7 +201,7 @@ fun BiliPlaylistDetailScreen(
         selectedIds = if (selectedIds.contains(id)) selectedIds - id else selectedIds + id
     }
     fun clearSelection() { selectedIds = emptySet() }
-    fun selectAll() { selectedIds = ui.videos.map { it.bvid }.toSet() }
+    fun selectAll() { selectedIds = ui.videos.map { it.stableKey }.toSet() }
     fun exitSelection() { selectionMode = false; clearSelection() }
 
     var showSearch by remember { mutableStateOf(false) }
@@ -216,6 +220,16 @@ fun BiliPlaylistDetailScreen(
         else ui.videos.filter {
             it.title.contains(searchQuery, true) || it.uploader.contains(searchQuery, true)
         }
+    }
+
+    fun BiliClient.VideoBasicInfo.resolveDisplayedCoverUrl(): String {
+        val matchedVideo = displayedVideos.firstOrNull { video ->
+            (bvid.isNotBlank() && video.bvid == bvid) || video.id == aid
+        }
+        return ui.header?.coverUrl?.takeIf { it.isNotBlank() }
+            ?: playlist.coverUrl.takeIf { it.isNotBlank() }
+            ?: matchedVideo?.coverUrl?.takeIf { it.isNotBlank() }
+            ?: coverUrl
     }
 
     AnimatedVisibility(
@@ -262,6 +276,9 @@ fun BiliPlaylistDetailScreen(
                                             coverUrl = header.coverUrl,
                                             trackCount = header.count,
                                             source = playlistSource,
+                                            fid = header.fid,
+                                            mid = header.mid,
+                                            bvid = header.bvid,
                                             songs = ui.videos.map { it.toSongItem() }
                                         )
                                     }
@@ -332,7 +349,7 @@ fun BiliPlaylistDetailScreen(
                                 onClick = {
                                     if (selectedIds.isNotEmpty()) {
                                         val selectedSongs = ui.videos
-                                            .filter { it.bvid in selectedIds }
+                                            .filter { it.stableKey in selectedIds }
                                             .map { it.toSongItem() }
 
                                         showDownloadManager = true
@@ -374,8 +391,7 @@ fun BiliPlaylistDetailScreen(
                     }
                     val activeSong = currentSong
                     val currentVideoIndex = displayedVideos.indexOfFirst { video ->
-                        activeSong?.album?.startsWith(PlayerManager.BILI_SOURCE_TAG) == true &&
-                            activeSong.id == video.id
+                        activeSong?.matches(video) == true
                     }
 
                     LazyColumn(
@@ -426,36 +442,40 @@ fun BiliPlaylistDetailScreen(
                                 }
                             }
                             else -> {
-                                itemsIndexed(displayedVideos, key = { _, it -> it.id }) { index, item ->
+                                itemsIndexed(displayedVideos, key = { _, it -> it.stableKey }) { index, item ->
                                     VideoRow(
                                         index = index + 1,
                                         video = item,
-                                        isCurrentSong = activeSong?.album?.startsWith(PlayerManager.BILI_SOURCE_TAG) == true &&
-                                            activeSong.id == item.id,
-                                        animatePlayingIndicator = activeSong?.album?.startsWith(PlayerManager.BILI_SOURCE_TAG) == true &&
-                                            activeSong.id == item.id &&
-                                            isPlaying,
+                                        isCurrentSong = activeSong?.matches(item) == true,
+                                        animatePlayingIndicator = activeSong?.matches(item) == true && isPlaying,
                                         selectionMode = selectionMode,
-                                        selected = selectedIds.contains(item.bvid),
-                                        onToggleSelect = { toggleSelect(item.bvid) },
+                                        selected = selectedIds.contains(item.stableKey),
+                                        onToggleSelect = { toggleSelect(item.stableKey) },
                                         onLongPress = {
                                             if (!selectionMode) {
                                                 selectionMode = true
-                                                selectedIds = setOf(item.bvid)
+                                                selectedIds = setOf(item.stableKey)
                                             }
                                         },
                                         onClick = {
                                             scope.launch {
                                                 try {
-                                                    val info = vm.getVideoInfo(item.bvid)
-                                                    if (info.pages.size <= 1) {
+                                                    if (item.cid > 0L) {
                                                         val fullList = ui.videos
                                                         val originalIndex =
-                                                            fullList.indexOfFirst { it.id == item.id }
+                                                            fullList.indexOfFirst { it.stableKey == item.stableKey }
                                                         onPlayAudio(fullList, originalIndex)
                                                     } else {
-                                                        partsInfo = info
-                                                        showPartsSheet = true
+                                                        val info = vm.getVideoInfo(item)
+                                                        if (info.pages.size <= 1) {
+                                                            val fullList = ui.videos
+                                                            val originalIndex =
+                                                                fullList.indexOfFirst { it.stableKey == item.stableKey }
+                                                            onPlayAudio(fullList, originalIndex)
+                                                        } else {
+                                                            partsInfo = info
+                                                            showPartsSheet = true
+                                                        }
                                                     }
                                                 } catch (e: Exception) {
                                                     NPLogger.e("BiliPlaylistDetail", context.getString(R.string.bili_get_parts_failed), e)
@@ -513,13 +533,13 @@ fun BiliPlaylistDetailScreen(
                                         .padding(vertical = 10.dp)
                                         .clickable {
                                             val songs = if (partsSelectionMode && partsInfo != null) {
-                                                val originalVideoItem = displayedVideos.find { it.bvid == partsInfo!!.bvid }
+                                                val partsCoverUrl = partsInfo!!.resolveDisplayedCoverUrl()
                                                 partsInfo!!.pages
                                                     .filter { selectedParts.contains(it.page) }
-                                                    .map { page -> vm.toSongItem(page, partsInfo!!, originalVideoItem?.coverUrl ?: "") }
+                                                    .map { page -> vm.toSongItem(page, partsInfo!!, partsCoverUrl) }
                                             } else {
                                                 ui.videos
-                                                    .filter { selectedIds.contains(it.bvid) }
+                                                    .filter { selectedIds.contains(it.stableKey) }
                                                     .map { it.toSongItem() }
                                             }
 
@@ -567,13 +587,13 @@ fun BiliPlaylistDetailScreen(
                                     if (name.isBlank()) return@HapticTextButton
 
                                     val songs = if (partsSelectionMode && partsInfo != null) {
-                                        val originalVideoItem = displayedVideos.find { it.bvid == partsInfo!!.bvid }
+                                        val partsCoverUrl = partsInfo!!.resolveDisplayedCoverUrl()
                                         partsInfo!!.pages
                                             .filter { selectedParts.contains(it.page) }
-                                            .map { page -> vm.toSongItem(page, partsInfo!!, originalVideoItem?.coverUrl ?: "") }
+                                            .map { page -> vm.toSongItem(page, partsInfo!!, partsCoverUrl) }
                                     } else {
                                         ui.videos
-                                            .filter { selectedIds.contains(it.bvid) }
+                                            .filter { selectedIds.contains(it.stableKey) }
                                             .map { it.toSongItem() }
                                     }
 
@@ -697,7 +717,7 @@ fun BiliPlaylistDetailScreen(
                         HorizontalDivider()
 
                         LazyColumn {
-                            val originalVideoItem = displayedVideos.find { it.bvid == currentPartsInfo.bvid }
+                            val partsCoverUrl = currentPartsInfo.resolveDisplayedCoverUrl()
 
                             itemsIndexed(currentPartsInfo.pages, key = { _, page -> page.page }) { index, page ->
                                 Row(
@@ -712,7 +732,7 @@ fun BiliPlaylistDetailScreen(
                                                         selectedParts + page.page
                                                     }
                                                 } else {
-                                                    onPlayParts(currentPartsInfo, index, originalVideoItem?.coverUrl ?: "")
+                                                    onPlayParts(currentPartsInfo, index, partsCoverUrl)
                                                     scope.launch { partsSheetState.hide() }.invokeOnCompletion {
                                                         if (!partsSheetState.isVisible) showPartsSheet = false
                                                     }
@@ -765,15 +785,28 @@ fun BiliPlaylistDetailScreen(
 }
 
 private fun BiliVideoItem.toSongItem(): SongItem {
+    val hasPart = cid > 0L
     return SongItem(
         id = this.id,
         name = this.title,
         artist = this.uploader,
-        album = PlayerManager.BILI_SOURCE_TAG,
+        album = if (hasPart) "${PlayerManager.BILI_SOURCE_TAG}|$cid" else PlayerManager.BILI_SOURCE_TAG,
         albumId = 0L,
         durationMs = this.durationSec * 1000L,
-        coverUrl = this.coverUrl
+        coverUrl = this.coverUrl,
+        channelId = "bilibili",
+        audioId = this.id.toString(),
+        subAudioId = cid.takeIf { hasPart }?.toString()
     )
+}
+
+private fun SongItem.matches(video: BiliVideoItem): Boolean {
+    if (!album.startsWith(PlayerManager.BILI_SOURCE_TAG) || id != video.id) return false
+    if (video.cid <= 0L) return true
+
+    val songCid = subAudioId?.toLongOrNull()
+        ?: album.split('|').getOrNull(1)?.toLongOrNull()
+    return songCid == video.cid
 }
 
 @Composable
@@ -868,11 +901,11 @@ private fun VideoRow(
                 },
                 onLongClick = onLongPress
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.width(40.dp),
+            modifier = Modifier.width(48.dp),
             contentAlignment = Alignment.Center
         ) {
             if (selectionMode) {
@@ -883,30 +916,23 @@ private fun VideoRow(
             } else {
                 Text(
                     text = index.toString(),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
                     textAlign = TextAlign.Center
                 )
             }
         }
 
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current).data(video.coverUrl).build(),
-            contentDescription = video.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(width = 100.dp, height = 60.dp)
-                .clip(RoundedCornerShape(8.dp))
-        )
-        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = video.title,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.titleMedium
             )
-            Spacer(Modifier.height(4.dp))
             Text(
                 text = video.uploader,
                 maxLines = 1,
@@ -938,7 +964,7 @@ private fun VideoRow(
                 ) {
                     Icon(
                         Icons.Filled.MoreVert,
-                        contentDescription = stringResource(R.string.common_more_actions),
+                        contentDescription = stringResource(R.string.cd_more_actions),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

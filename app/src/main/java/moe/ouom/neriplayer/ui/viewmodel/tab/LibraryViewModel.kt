@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.ouom.neriplayer.R
+import moe.ouom.neriplayer.core.api.bili.BiliClient
 import moe.ouom.neriplayer.core.api.youtube.YouTubeMusicLibraryPlaylist
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.data.local.playlist.model.LocalPlaylist
@@ -42,6 +43,8 @@ import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 import moe.ouom.neriplayer.util.NPLogger
 import org.json.JSONObject
 import java.io.IOException
+
+private const val BILI_VIDEO_INFO_BATCH_SIZE = 4
 
 /** 媒体库页面 UI 状态 */
 data class LibraryUiState(
@@ -52,7 +55,10 @@ data class LibraryUiState(
     val youtubeMusicPlaylists: List<YouTubeMusicPlaylist> = emptyList(),
     val youtubeMusicError: String? = null,
     val biliPlaylists: List<BiliPlaylist> = emptyList(),
-    val biliError: String? = null
+    val biliError: String? = null,
+    val biliFolderCollections: Map<Long, List<BiliPlaylist>> = emptyMap(),
+    val biliFolderCollectionLoading: Set<Long> = emptySet(),
+    val biliFolderCollectionErrors: Map<Long, String> = emptyMap()
 )
 
 @Suppress("unused")
@@ -141,7 +147,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun refreshBilibili() {
+    fun refreshBilibili() {
         viewModelScope.launch {
             try {
                 val mid = biliCookieRepo.getCookiesOnce()["DedeUserID"]?.toLongOrNull() ?: 0L
@@ -161,7 +167,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                     mediaId = folderInfo.mediaId,
                                     fid = folderInfo.fid,
                                     mid = folderInfo.mid,
-                                    title = folderInfo.title,
+                                    title = normalizeBiliPlaylistTitle(folderInfo.title),
                                     count = folderInfo.count,
                                     coverUrl = folderInfo.coverUrl.replace("http://", "https://")
                                 )
@@ -172,7 +178,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                     mediaId = folder.mediaId,
                                     fid = folder.fid,
                                     mid = folder.mid,
-                                    title = folder.title,
+                                    title = normalizeBiliPlaylistTitle(folder.title),
                                     count = folder.count,
                                     coverUrl = ""
                                 )
@@ -190,6 +196,72 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.value = _uiState.value.copy(biliError = e.message)
             }
         }
+    }
+
+    fun refreshBiliFolderCollections(folder: BiliPlaylist) {
+        val folderId = folder.mediaId
+        if (_uiState.value.biliFolderCollectionLoading.contains(folderId)) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                biliFolderCollectionLoading = _uiState.value.biliFolderCollectionLoading + folderId,
+                biliFolderCollectionErrors = _uiState.value.biliFolderCollectionErrors - folderId
+            )
+
+            try {
+                val mapped = withContext(Dispatchers.IO) {
+                    val videoItems = biliClient.getAllFavFolderItems(folderId)
+                        .filter { item -> item.type == 2 }
+
+                    videoItems
+                        .chunked(BILI_VIDEO_INFO_BATCH_SIZE)
+                        .flatMap { batch ->
+                            batch
+                                .map { item -> async { item.toBiliImportPlaylist() } }
+                                .awaitAll()
+                        }
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    biliFolderCollections = _uiState.value.biliFolderCollections + (folderId to mapped),
+                    biliFolderCollectionLoading = _uiState.value.biliFolderCollectionLoading - folderId,
+                    biliFolderCollectionErrors = _uiState.value.biliFolderCollectionErrors - folderId
+                )
+            } catch (e: IOException) {
+                _uiState.value = _uiState.value.copy(
+                    biliFolderCollectionLoading = _uiState.value.biliFolderCollectionLoading - folderId,
+                    biliFolderCollectionErrors = _uiState.value.biliFolderCollectionErrors + (folderId to (e.message ?: "Network error"))
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    biliFolderCollectionLoading = _uiState.value.biliFolderCollectionLoading - folderId,
+                    biliFolderCollectionErrors = _uiState.value.biliFolderCollectionErrors + (folderId to (e.message ?: e.javaClass.simpleName))
+                )
+            }
+        }
+    }
+
+    private suspend fun BiliClient.FavResourceItem.toBiliImportPlaylist(): BiliPlaylist {
+        val itemBvid = bvid.orEmpty()
+        val videoInfo = runCatching {
+            if (itemBvid.isNotBlank()) {
+                biliClient.getVideoBasicInfoByBvid(itemBvid)
+            } else {
+                biliClient.getVideoBasicInfoByAvid(id)
+            }
+        }.getOrNull()
+
+        return BiliPlaylist(
+            mediaId = id,
+            fid = BILI_SINGLE_VIDEO_FID,
+            mid = videoInfo?.ownerMid ?: upperMid,
+            title = normalizeBiliPlaylistTitle(
+                videoInfo?.title?.takeIf { it.isNotBlank() } ?: title
+            ),
+            count = videoInfo?.pages?.size?.takeIf { it > 0 } ?: 1,
+            coverUrl = (videoInfo?.coverUrl ?: coverUrl).replace("http://", "https://"),
+            bvid = videoInfo?.bvid?.takeIf { it.isNotBlank() } ?: itemBvid
+        )
     }
 
 

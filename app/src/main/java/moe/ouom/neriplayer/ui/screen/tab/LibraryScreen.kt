@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,11 +74,13 @@ import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -98,6 +101,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,6 +114,7 @@ import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.data.auth.common.SavedCookieAuthState
 import moe.ouom.neriplayer.data.auth.youtube.YouTubeAuthState
+import moe.ouom.neriplayer.data.playlist.favorite.FavoritePlaylist
 import moe.ouom.neriplayer.data.playlist.favorite.FavoritePlaylistRepository
 import moe.ouom.neriplayer.data.local.playlist.system.FavoritesPlaylist
 import moe.ouom.neriplayer.data.local.playlist.system.LocalFilesPlaylist
@@ -118,6 +123,7 @@ import moe.ouom.neriplayer.data.local.playlist.LocalPlaylistRepository
 import moe.ouom.neriplayer.data.local.playlist.system.SystemLocalPlaylists
 import moe.ouom.neriplayer.data.model.displayCoverUrl
 import moe.ouom.neriplayer.ui.LocalMiniPlayerHeight
+import moe.ouom.neriplayer.ui.component.bottomSheetScrollGuard
 import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsBiliAuthDialogs
 import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsNeteaseAuthDialogs
 import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
@@ -129,7 +135,9 @@ import moe.ouom.neriplayer.ui.viewmodel.auth.YouTubeAuthViewModel
 import moe.ouom.neriplayer.ui.viewmodel.debug.NeteaseAuthEvent
 import moe.ouom.neriplayer.ui.viewmodel.debug.NeteaseAuthViewModel
 import moe.ouom.neriplayer.ui.viewmodel.tab.AlbumSummary
+import moe.ouom.neriplayer.ui.viewmodel.tab.BILI_SINGLE_VIDEO_FID
 import moe.ouom.neriplayer.ui.viewmodel.tab.BiliPlaylist
+import moe.ouom.neriplayer.ui.viewmodel.tab.LibraryUiState
 import moe.ouom.neriplayer.ui.viewmodel.tab.LibraryViewModel
 import moe.ouom.neriplayer.ui.viewmodel.tab.PlaylistSummary
 import moe.ouom.neriplayer.ui.viewmodel.tab.YouTubeMusicPlaylist
@@ -177,6 +185,31 @@ private data class PlatformAuthUiState(
     val emptyHint: String,
     val actionLabel: String
 )
+
+private data class SourcePlaylistImportItem(
+    val key: String,
+    val id: Long,
+    val title: String,
+    val coverUrl: String?,
+    val trackCount: Int,
+    val source: String,
+    val browseId: String? = null,
+    val playlistId: String? = null,
+    val subtitle: String? = null,
+    val fid: Long? = null,
+    val mid: Long? = null,
+    val bvid: String? = null
+)
+
+private val LibraryAuthPlatform.favoriteSource: String?
+    get() = when (this) {
+        LibraryAuthPlatform.NETEASE -> "netease"
+        LibraryAuthPlatform.YOUTUBE -> "youtubeMusic"
+        LibraryAuthPlatform.BILI -> "bili"
+        LibraryAuthPlatform.QQMUSIC -> null
+    }
+
+private fun sourceImportKey(source: String, id: Long): String = "$source:$id"
 
 private fun libraryTabDisplayOrder(isInternational: Boolean): List<LibraryTab> {
     return if (isInternational) {
@@ -226,6 +259,8 @@ fun LibraryScreen(
     val biliAuthUiState by biliVm.uiState.collectAsState()
     val youtubeAuthUiState by youtubeVm.uiState.collectAsState()
     val context = LocalContext.current
+    val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
+    val importedFavorites by favoriteRepo.favorites.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val defaultPlaylistName = stringResource(R.string.library_create_playlist_default)
     val isInternational by AppContainer.settingsRepo.internationalizationEnabledFlow
@@ -259,6 +294,8 @@ fun LibraryScreen(
     var showYouTubeCookieDialog by remember { mutableStateOf(false) }
     var youtubeSheetInitialTab by rememberSaveable { mutableStateOf(0) }
     var youtubeCookieText by remember { mutableStateOf("") }
+    var manageSourcePlatform by remember { mutableStateOf<LibraryAuthPlatform?>(null) }
+    var selectedBiliFolder by rememberSaveable { mutableStateOf<BiliPlaylist?>(null) }
 
     fun openNeteaseAuth(tab: Int = 0) {
         inlineMsg = null
@@ -294,6 +331,20 @@ fun LibraryScreen(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
+    fun openSourceImport(platform: LibraryAuthPlatform) {
+        inlineMsg = null
+        when (platform) {
+            LibraryAuthPlatform.NETEASE -> {
+                vm.refreshNeteasePlaylists()
+                vm.refreshNeteaseAlbums()
+            }
+            LibraryAuthPlatform.YOUTUBE -> vm.refreshYouTubeMusicPlaylists()
+            LibraryAuthPlatform.BILI -> vm.refreshBilibili()
+            LibraryAuthPlatform.QQMUSIC -> Unit
+        }
+        manageSourcePlatform = platform
+    }
+
     LaunchedEffect(initialTab, orderedTabs) {
         val targetPage = orderedTabs.indexOf(initialTab).takeIf { it >= 0 } ?: 0
         if (pagerState.currentPage != targetPage) {
@@ -303,6 +354,9 @@ fun LibraryScreen(
 
     LaunchedEffect(pagerState.currentPage, orderedTabs, initialTab) {
         val currentTab = orderedTabs.getOrNull(pagerState.currentPage) ?: return@LaunchedEffect
+        if (currentTab != LibraryTab.BILI) {
+            selectedBiliFolder = null
+        }
         if (currentTab != initialTab) {
             onTabChange(currentTab)
         }
@@ -316,6 +370,12 @@ fun LibraryScreen(
         neteaseVm.refreshAuthHealth()
         biliVm.refreshAuthHealth()
         youtubeVm.refreshAuthHealth()
+    }
+
+    LaunchedEffect(selectedBiliFolder?.mediaId) {
+        selectedBiliFolder?.let { folder ->
+            vm.refreshBiliFolderCollections(folder)
+        }
     }
 
     LaunchedEffect(neteaseVm) {
@@ -450,6 +510,10 @@ fun LibraryScreen(
         showPlatformAccountPage = false
     }
 
+    BackHandler(enabled = selectedBiliFolder != null && !showPlatformAccountPage) {
+        selectedBiliFolder = null
+    }
+
     if (showPlatformAccountPage) {
         PlatformAccountPage(
             platforms = platformAuthStates,
@@ -578,13 +642,29 @@ fun LibraryScreen(
                                 onRetry = { vm.refreshYouTubeMusicPlaylists() }
                             )
 
-                            LibraryTab.BILI -> BiliPlaylistList(
-                                playlists = ui.biliPlaylists,
-                                listState = biliListState,
-                                authUiState = biliAuth,
-                                onClick = onBiliPlaylistClick,
-                                onAuthAction = { openBiliAuth() }
-                            )
+                            LibraryTab.BILI -> {
+                                val folder = selectedBiliFolder
+                                if (folder == null) {
+                                    BiliPlaylistList(
+                                        playlists = ui.biliPlaylists,
+                                        listState = biliListState,
+                                        authUiState = biliAuth,
+                                        onClick = { selectedBiliFolder = it },
+                                        onAuthAction = { openBiliAuth() }
+                                    )
+                                } else {
+                                    BiliFolderCollectionList(
+                                        folder = folder,
+                                        collections = ui.biliFolderCollections[folder.mediaId].orEmpty(),
+                                        loading = ui.biliFolderCollectionLoading.contains(folder.mediaId),
+                                        error = ui.biliFolderCollectionErrors[folder.mediaId],
+                                        listState = biliListState,
+                                        onClick = onBiliPlaylistClick,
+                                        onNavigateUp = { selectedBiliFolder = null },
+                                        onRetry = { vm.refreshBiliFolderCollections(folder) }
+                                    )
+                                }
+                            }
 
                             LibraryTab.QQMUSIC -> QqMusicPlaylistList(
                                 listState = qqMusicListState
@@ -592,6 +672,30 @@ fun LibraryScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    manageSourcePlatform?.let { platform ->
+        platformAuthStates.firstOrNull { it.platform == platform }?.let { authUiState ->
+            if (platform == LibraryAuthPlatform.BILI) {
+                BiliSourcePlaylistImportSheet(
+                    authUiState = authUiState,
+                    folders = ui.biliPlaylists,
+                    ui = ui,
+                    favorites = importedFavorites,
+                    favoriteRepo = favoriteRepo,
+                    onLoadFolder = vm::refreshBiliFolderCollections,
+                    onDismiss = { manageSourcePlatform = null }
+                )
+            } else {
+                SourcePlaylistImportSheet(
+                    authUiState = authUiState,
+                    importItems = sourcePlaylistImportItems(platform, ui),
+                    favorites = importedFavorites,
+                    favoriteRepo = favoriteRepo,
+                    onDismiss = { manageSourcePlatform = null }
+                )
             }
         }
     }
@@ -619,7 +723,8 @@ fun LibraryScreen(
         onLogout = {
             showNeteaseSavedCookieDialog = false
             neteaseVm.clearCookies()
-        }
+        },
+        onManageSource = { openSourceImport(LibraryAuthPlatform.NETEASE) }
     )
 
     SettingsBiliAuthDialogs(
@@ -642,7 +747,8 @@ fun LibraryScreen(
         onLogout = {
             showBiliSavedCookieDialog = false
             biliVm.clearCookies()
-        }
+        },
+        onManageSource = { openSourceImport(LibraryAuthPlatform.BILI) }
     )
 
     SettingsYouTubeAuthDialogs(
@@ -665,7 +771,8 @@ fun LibraryScreen(
         onLogout = {
             showYouTubeSavedCookieDialog = false
             youtubeVm.clearAuth()
-        }
+        },
+        onManageSource = { openSourceImport(LibraryAuthPlatform.YOUTUBE) }
     )
 }
 
@@ -860,6 +967,625 @@ private fun PlatformAccountRow(
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
+}
+
+private fun sourcePlaylistImportItems(
+    platform: LibraryAuthPlatform,
+    ui: LibraryUiState
+): List<SourcePlaylistImportItem> {
+    return when (platform) {
+        LibraryAuthPlatform.NETEASE -> ui.neteasePlaylists.map { playlist ->
+            SourcePlaylistImportItem(
+                key = sourceImportKey("netease", playlist.id),
+                id = playlist.id,
+                title = playlist.name,
+                coverUrl = playlist.picUrl,
+                trackCount = playlist.trackCount,
+                source = "netease"
+            )
+        }
+        LibraryAuthPlatform.YOUTUBE -> ui.youtubeMusicPlaylists.map { playlist ->
+            val favoriteId = playlist.favoriteId()
+            SourcePlaylistImportItem(
+                key = sourceImportKey("youtubeMusic", favoriteId),
+                id = favoriteId,
+                title = playlist.title,
+                coverUrl = playlist.coverUrl,
+                trackCount = playlist.trackCount,
+                source = "youtubeMusic",
+                browseId = playlist.browseId,
+                playlistId = playlist.playlistId,
+                subtitle = playlist.subtitle
+            )
+        }
+        LibraryAuthPlatform.BILI -> ui.biliPlaylists.map { playlist ->
+            SourcePlaylistImportItem(
+                key = sourceImportKey("bili", playlist.mediaId),
+                id = playlist.mediaId,
+                title = playlist.title,
+                coverUrl = playlist.coverUrl,
+                trackCount = playlist.count,
+                source = "bili",
+                fid = playlist.fid,
+                mid = playlist.mid,
+                bvid = playlist.bvid
+            )
+        }
+        LibraryAuthPlatform.QQMUSIC -> emptyList()
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SourcePlaylistImportSheet(
+    authUiState: PlatformAuthUiState,
+    importItems: List<SourcePlaylistImportItem>,
+    favorites: List<FavoritePlaylist>,
+    favoriteRepo: FavoritePlaylistRepository,
+    onDismiss: () -> Unit
+) {
+    val favoriteSource = authUiState.platform.favoriteSource ?: return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val itemKeys = remember(importItems) { importItems.map { it.key }.toSet() }
+    val importedKeys = remember(favorites, favoriteSource, itemKeys) {
+        favorites
+            .filter { it.source == favoriteSource }
+            .map { sourceImportKey(it.source, it.id) }
+            .filter { it in itemKeys }
+            .toSet()
+    }
+    var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val allSelected = importItems.isNotEmpty() && selectedKeys.size == importItems.size
+
+    LaunchedEffect(authUiState.platform, itemKeys, importedKeys) {
+        selectedKeys = importedKeys
+    }
+
+    fun toggleItem(key: String) {
+        selectedKeys = if (key in selectedKeys) selectedKeys - key else selectedKeys + key
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        sheetGesturesEnabled = false,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .bottomSheetScrollGuard()
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = authUiState.iconResId),
+                    contentDescription = authUiState.title,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.library_source_import_title, authUiState.title),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (importItems.isEmpty()) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.library_source_import_empty)) },
+                    supportingContent = {
+                        Text(
+                            text = authUiState.statusText,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(
+                        items = importItems,
+                        key = { it.key }
+                    ) { item ->
+                        val selected = item.key in selectedKeys
+                        ListItem(
+                            leadingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = selected,
+                                        onCheckedChange = { toggleItem(item.key) }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    if (!item.coverUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = offlineCachedImageRequest(
+                                                context = context,
+                                                data = item.coverUrl,
+                                                sizePx = 160,
+                                                allowHardware = false
+                                            ),
+                                            contentDescription = item.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                            contentDescription = item.title,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            headlineContent = {
+                                Text(
+                                    text = item.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = pluralStringResource(
+                                        R.plurals.library_song_count,
+                                        item.trackCount,
+                                        item.trackCount
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable { toggleItem(item.key) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HapticTextButton(
+                    enabled = importItems.isNotEmpty(),
+                    onClick = {
+                        selectedKeys = if (allSelected) {
+                            emptySet()
+                        } else {
+                            itemKeys
+                        }
+                    }
+                ) {
+                    Text(
+                        if (allSelected) {
+                            stringResource(R.string.action_deselect_all)
+                        } else {
+                            stringResource(R.string.action_select_all)
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                HapticTextButton(
+                    enabled = importItems.isNotEmpty(),
+                    onClick = {
+                        val selectedItems = importItems.filter { it.key in selectedKeys }
+                        val visibleFavorites = favorites.filter { favorite ->
+                            favorite.source == favoriteSource &&
+                                sourceImportKey(favorite.source, favorite.id) in itemKeys
+                        }
+                        scope.launch {
+                            visibleFavorites
+                                .filterNot { sourceImportKey(it.source, it.id) in selectedKeys }
+                                .forEach { favoriteRepo.removeFavorite(it.id, it.source) }
+                            selectedItems.forEach { item ->
+                                favoriteRepo.addFavorite(
+                                    id = item.id,
+                                    name = item.title,
+                                    coverUrl = item.coverUrl,
+                                    trackCount = item.trackCount,
+                                    source = item.source,
+                                    browseId = item.browseId,
+                                    playlistId = item.playlistId,
+                                    subtitle = item.subtitle,
+                                    fid = item.fid,
+                                    mid = item.mid,
+                                    bvid = item.bvid,
+                                    songs = emptyList()
+                                )
+                            }
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.library_source_import_updated),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onDismiss()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.library_source_import_apply, selectedKeys.size))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun BiliSourcePlaylistImportSheet(
+    authUiState: PlatformAuthUiState,
+    folders: List<BiliPlaylist>,
+    ui: LibraryUiState,
+    favorites: List<FavoritePlaylist>,
+    favoriteRepo: FavoritePlaylistRepository,
+    onLoadFolder: (BiliPlaylist) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val favoriteSource = "bili"
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedFolder by remember { mutableStateOf<BiliPlaylist?>(null) }
+    val folder = selectedFolder
+    val collections = folder?.let { ui.biliFolderCollections[it.mediaId] }.orEmpty()
+    val loading = folder?.let { ui.biliFolderCollectionLoading.contains(it.mediaId) } == true
+    val error = folder?.let { ui.biliFolderCollectionErrors[it.mediaId] }
+    val importItems = remember(collections) {
+        collections.map { playlist ->
+            SourcePlaylistImportItem(
+                key = sourceImportKey(favoriteSource, playlist.mediaId),
+                id = playlist.mediaId,
+                title = playlist.title,
+                coverUrl = playlist.coverUrl,
+                trackCount = playlist.count,
+                source = favoriteSource,
+                fid = playlist.fid,
+                mid = playlist.mid,
+                bvid = playlist.bvid
+            )
+        }
+    }
+    val itemKeys = remember(importItems) { importItems.map { it.key }.toSet() }
+    val importedKeys = remember(favorites, itemKeys) {
+        favorites
+            .filter { it.source == favoriteSource }
+            .map { sourceImportKey(it.source, it.id) }
+            .filter { it in itemKeys }
+            .toSet()
+    }
+    var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val allSelected = importItems.isNotEmpty() && selectedKeys.size == importItems.size
+
+    BackHandler(enabled = folder != null) {
+        selectedFolder = null
+    }
+
+    LaunchedEffect(folder?.mediaId) {
+        val currentFolder = folder ?: return@LaunchedEffect
+        onLoadFolder(currentFolder)
+    }
+
+    LaunchedEffect(folder?.mediaId, itemKeys, importedKeys) {
+        selectedKeys = importedKeys
+    }
+
+    fun toggleItem(key: String) {
+        selectedKeys = if (key in selectedKeys) selectedKeys - key else selectedKeys + key
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        sheetGesturesEnabled = false,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .bottomSheetScrollGuard()
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = authUiState.iconResId),
+                    contentDescription = authUiState.title,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.library_source_import_title, authUiState.title),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (folder == null) {
+                if (folders.isEmpty()) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.library_source_import_empty)) },
+                        supportingContent = {
+                            Text(
+                                text = authUiState.statusText,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(
+                            items = folders,
+                            key = { it.mediaId }
+                        ) { item ->
+                            ListItem(
+                                leadingContent = {
+                                    if (item.coverUrl.isNotBlank()) {
+                                        AsyncImage(
+                                            model = offlineCachedImageRequest(
+                                                context = context,
+                                                data = item.coverUrl,
+                                                sizePx = 160,
+                                                allowHardware = false
+                                            ),
+                                            contentDescription = item.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                            contentDescription = item.title,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                    }
+                                },
+                                headlineContent = {
+                                    Text(
+                                        text = item.title,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        text = pluralStringResource(
+                                            R.plurals.library_song_count,
+                                            item.count,
+                                            item.count
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { selectedFolder = item },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+                }
+            } else {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = folder.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingContent = {
+                        HapticIconButton(onClick = { selectedFolder = null }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back)
+                            )
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+
+                when {
+                    loading && importItems.isEmpty() -> {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.library_bili_folder_loading)) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    !error.isNullOrBlank() && importItems.isEmpty() -> {
+                        ListItem(
+                            headlineContent = {
+                                Text(stringResource(R.string.library_bili_folder_load_failed, error))
+                            },
+                            trailingContent = {
+                                HapticTextButton(onClick = { onLoadFolder(folder) }) {
+                                    Text(stringResource(R.string.action_retry))
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    importItems.isEmpty() -> {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.library_bili_folder_empty)) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(
+                                items = importItems,
+                                key = { it.key }
+                            ) { item ->
+                                val selected = item.key in selectedKeys
+                                ListItem(
+                                    leadingContent = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Checkbox(
+                                                checked = selected,
+                                                onCheckedChange = { toggleItem(item.key) }
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            if (!item.coverUrl.isNullOrBlank()) {
+                                                AsyncImage(
+                                                    model = offlineCachedImageRequest(
+                                                        context = context,
+                                                        data = item.coverUrl,
+                                                        sizePx = 160,
+                                                        allowHardware = false
+                                                    ),
+                                                    contentDescription = item.title,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .size(48.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                                    contentDescription = item.title,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(48.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    headlineContent = {
+                                        Text(
+                                            text = item.title,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            text = pluralStringResource(
+                                                R.plurals.library_song_count,
+                                                item.trackCount,
+                                                item.trackCount
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .clickable { toggleItem(item.key) },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HapticTextButton(
+                        enabled = importItems.isNotEmpty(),
+                        onClick = {
+                            selectedKeys = if (allSelected) {
+                                emptySet()
+                            } else {
+                                itemKeys
+                            }
+                        }
+                    ) {
+                        Text(
+                            if (allSelected) {
+                                stringResource(R.string.action_deselect_all)
+                            } else {
+                                stringResource(R.string.action_select_all)
+                            }
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    HapticTextButton(
+                        enabled = importItems.isNotEmpty(),
+                        onClick = {
+                            val selectedItems = importItems.filter { it.key in selectedKeys }
+                            val visibleFavorites = favorites.filter { favorite ->
+                                favorite.source == favoriteSource &&
+                                    sourceImportKey(favorite.source, favorite.id) in itemKeys
+                            }
+                            scope.launch {
+                                visibleFavorites
+                                    .filterNot { sourceImportKey(it.source, it.id) in selectedKeys }
+                                    .forEach { favoriteRepo.removeFavorite(it.id, it.source) }
+                                selectedItems.forEach { item ->
+                                    favoriteRepo.addFavorite(
+                                        id = item.id,
+                                        name = item.title,
+                                        coverUrl = item.coverUrl,
+                                        trackCount = item.trackCount,
+                                        source = item.source,
+                                        fid = item.fid,
+                                        mid = item.mid,
+                                        bvid = item.bvid,
+                                        songs = emptyList()
+                                    )
+                                }
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.library_source_import_updated),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                onDismiss()
+                            }
+                        }
+                    ) {
+                        Text(stringResource(R.string.library_source_import_apply, selectedKeys.size))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -1158,6 +1884,170 @@ private fun YouTubeMusicPlaylistList(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BiliFolderCollectionList(
+    folder: BiliPlaylist,
+    collections: List<BiliPlaylist>,
+    loading: Boolean,
+    error: String?,
+    listState: LazyListState,
+    onClick: (BiliPlaylist) -> Unit,
+    onNavigateUp: () -> Unit,
+    onRetry: () -> Unit
+) {
+    val miniPlayerHeight = LocalMiniPlayerHeight.current
+
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp + miniPlayerHeight),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        val cardShape = RoundedCornerShape(12.dp)
+        item(key = "bili_folder_header_${folder.mediaId}") {
+            Card(
+                shape = cardShape,
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .clip(cardShape)
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = folder.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = stringResource(R.string.library_bili_folder_collections),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    leadingContent = {
+                        HapticIconButton(onClick = onNavigateUp) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back)
+                            )
+                        }
+                    }
+                )
+            }
+        }
+
+        when {
+            loading && collections.isEmpty() -> {
+                item(key = "bili_folder_loading") {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.library_bili_folder_loading)) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+            }
+            error != null && collections.isEmpty() -> {
+                item(key = "bili_folder_error") {
+                    Card(
+                        shape = cardShape,
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clip(cardShape)
+                    ) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(R.string.library_bili_folder_load_failed, error),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            trailingContent = {
+                                HapticTextButton(onClick = onRetry) {
+                                    Text(stringResource(R.string.action_retry))
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+            collections.isEmpty() -> {
+                item(key = "bili_folder_empty") {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.library_bili_folder_empty)) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        leadingContent = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(56.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        items(
+            items = collections,
+            key = { it.mediaId }
+        ) { collection ->
+            Card(
+                shape = cardShape,
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .animateItem()
+                    .clip(cardShape)
+                    .clickable { onClick(collection) }
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = collection.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = stringResource(R.string.library_bili_collection),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    leadingContent = {
+                        if (collection.coverUrl.isNotEmpty()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current).data(collection.coverUrl).build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(56.dp)
+                            )
+                        }
+                    }
+                )
             }
         }
     }
@@ -2317,14 +3207,21 @@ private fun FavoritePlaylistList(
                                             }
                                         }
                                         "bili" -> {
+                                            val savedFid = favorite.fid
+                                            val savedBvid = favorite.bvid.orEmpty()
                                             onBiliPlaylistClick(
                                                 BiliPlaylist(
                                                     mediaId = favorite.id,
-                                                    fid = 0L,
-                                                    mid = 0L,
+                                                    fid = savedFid ?: if (savedBvid.isNotBlank()) {
+                                                        BILI_SINGLE_VIDEO_FID
+                                                    } else {
+                                                        0L
+                                                    },
+                                                    mid = favorite.mid ?: 0L,
                                                     title = favorite.name,
                                                     count = favorite.trackCount,
-                                                    coverUrl = favorite.coverUrl.orEmpty()
+                                                    coverUrl = favorite.coverUrl.orEmpty(),
+                                                    bvid = savedBvid
                                                 )
                                             )
                                         }

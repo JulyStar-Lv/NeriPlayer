@@ -28,41 +28,21 @@ package moe.ouom.neriplayer.ui.screen.tab.settings.auth
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.activity.NeteaseWebLoginActivity
-import moe.ouom.neriplayer.ui.component.bottomSheetDragBlocker
-import moe.ouom.neriplayer.ui.screen.tab.settings.component.InlineMessage
 import moe.ouom.neriplayer.ui.viewmodel.debug.NeteaseAuthViewModel
-import moe.ouom.neriplayer.util.HapticButton
 import moe.ouom.neriplayer.util.HapticTextButton
 import org.json.JSONObject
 
@@ -84,18 +64,44 @@ internal fun SettingsNeteaseAuthDialogs(
     onDismissSavedCookieDialog: () -> Unit = {},
     onOpenSheetAtTab: (Int) -> Unit = {},
     onLogout: (() -> Unit)? = null,
-    onBrowserLogin: (() -> Unit)? = null
+    onBrowserLogin: (() -> Unit)? = null,
+    onManageSource: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val webLoginLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val json = result.data?.getStringExtra(NeteaseWebLoginActivity.RESULT_COOKIE) ?: "{}"
+            vm.importCookiesFromMap(parseCookieMap(json))
+        } else {
+            onInlineMsgChange(context.getString(R.string.settings_cookie_cancelled))
+        }
+    }
+    val launchBrowserLogin: () -> Unit = {
+        onInlineMsgChange(null)
+        val injectedBrowserLogin = onBrowserLogin
+        if (injectedBrowserLogin != null) {
+            injectedBrowserLogin()
+        } else {
+            webLoginLauncher.launch(Intent(context, NeteaseWebLoginActivity::class.java))
+        }
+    }
 
     if (showSavedCookieDialog) {
-        SavedCookieActionDialog(
-            title = stringResource(R.string.settings_netease_saved_cookie_title),
-            message = stringResource(R.string.settings_netease_saved_cookie_message),
+        SavedCookieActionSheet(
+            sourceName = stringResource(R.string.platform_netease),
+            sourceIconResId = R.drawable.ic_netease_cloud_music,
             onDismiss = onDismissSavedCookieDialog,
-            onContinueLogin = {
+            onManageSource = onManageSource?.let { manage ->
+                {
+                    onDismissSavedCookieDialog()
+                    manage()
+                }
+            },
+            onRelogin = {
                 onDismissSavedCookieDialog()
-                onOpenSheetAtTab(0)
+                launchBrowserLogin()
             },
             onLogout = {
                 onDismissSavedCookieDialog()
@@ -133,121 +139,9 @@ internal fun SettingsNeteaseAuthDialogs(
     }
 
     if (showSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
-        var rawCookie by remember { mutableStateOf("") }
-        val launchBrowserLogin: () -> Unit = onBrowserLogin?.let { injectedBrowserLogin ->
-            {
-                onInlineMsgChange(null)
-                injectedBrowserLogin()
-            }
-        } ?: run {
-            val webLoginLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.StartActivityForResult()
-            ) { result ->
-                if (result.resultCode == android.app.Activity.RESULT_OK) {
-                    val json = result.data?.getStringExtra(NeteaseWebLoginActivity.RESULT_COOKIE) ?: "{}"
-                    vm.importCookiesFromMap(parseCookieMap(json))
-                } else {
-                    onInlineMsgChange(context.getString(R.string.settings_cookie_cancelled))
-                }
-            }
-            val defaultBrowserLogin: () -> Unit = {
-                onInlineMsgChange(null)
-                webLoginLauncher.launch(Intent(context, NeteaseWebLoginActivity::class.java))
-            }
-            defaultBrowserLogin
-        }
-
-        ModalBottomSheet(
-            onDismissRequest = onDismissSheet,
-            sheetState = sheetState,
-            sheetGesturesEnabled = false,
-            containerColor = MaterialTheme.colorScheme.surface
-        ) {
-            Box(
-                modifier = Modifier
-                    .bottomSheetDragBlocker()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 48.dp, top = 12.dp)
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.login_netease),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    AnimatedVisibility(
-                        visible = inlineMsg != null,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        InlineMessage(
-                            text = inlineMsg ?: "",
-                            onClose = { onInlineMsgChange(null) }
-                        )
-                    }
-
-                    PrimaryTabRow(selectedTabIndex = selectedTab) {
-                        Tab(
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            text = { Text(stringResource(R.string.login_browser)) }
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            text = { Text(stringResource(R.string.login_paste_cookie)) }
-                        )
-                        Tab(
-                            selected = selectedTab == 2,
-                            onClick = { selectedTab = 2 },
-                            text = { Text(stringResource(R.string.login_verification_code)) }
-                        )
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    when (selectedTab) {
-                        0 -> {
-                            Text(
-                                stringResource(R.string.settings_netease_login_browser_hint),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            HapticButton(onClick = launchBrowserLogin) {
-                                Text(stringResource(R.string.login_start_browser))
-                            }
-                        }
-
-                        1 -> {
-                            androidx.compose.material3.OutlinedTextField(
-                                value = rawCookie,
-                                onValueChange = { rawCookie = it },
-                                label = { Text(stringResource(R.string.login_paste_cookie_hint)) },
-                                minLines = 6,
-                                maxLines = 10,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            HapticButton(
-                                onClick = {
-                                    if (rawCookie.isBlank()) {
-                                        onInlineMsgChange(context.getString(R.string.settings_cookie_input_hint))
-                                    } else {
-                                        vm.importCookiesFromRaw(rawCookie)
-                                    }
-                                }
-                            ) {
-                                Text(stringResource(R.string.login_save_cookie))
-                            }
-                        }
-
-                        else -> NeteaseLoginContent(vm = vm)
-                    }
-                }
-            }
+        LaunchedEffect(showSheet) {
+            launchBrowserLogin()
+            onDismissSheet()
         }
     }
 

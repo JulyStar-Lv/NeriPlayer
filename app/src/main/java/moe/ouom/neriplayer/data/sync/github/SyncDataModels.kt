@@ -248,7 +248,10 @@ data class SyncFavoritePlaylist(
     @ProtoNumber(10) val sortOrder: Long = addedTime,
     @ProtoNumber(11) val browseId: String? = null,
     @ProtoNumber(12) val playlistId: String? = null,
-    @ProtoNumber(13) val subtitle: String? = null
+    @ProtoNumber(13) val subtitle: String? = null,
+    @ProtoNumber(14) val fid: Long? = null,
+    @ProtoNumber(15) val mid: Long? = null,
+    @ProtoNumber(16) val bvid: String? = null
 ) {
     companion object {
         fun fromFavoritePlaylist(playlist: FavoritePlaylist, context: Context? = null): SyncFavoritePlaylist {
@@ -266,7 +269,10 @@ data class SyncFavoritePlaylist(
                     sortOrder = playlist.sortOrder,
                     browseId = playlist.browseId,
                     playlistId = playlist.playlistId,
-                    subtitle = playlist.subtitle
+                    subtitle = playlist.subtitle,
+                    fid = playlist.fid,
+                    mid = playlist.mid,
+                    bvid = playlist.bvid
                 )
             }
             val syncedSongs = playlist.songs.mapNotNull { SyncSong.fromSongItemOrNull(it, context) }
@@ -291,7 +297,10 @@ data class SyncFavoritePlaylist(
                 sortOrder = playlist.sortOrder,
                 browseId = playlist.browseId,
                 playlistId = playlist.playlistId,
-                subtitle = playlist.subtitle
+                subtitle = playlist.subtitle,
+                fid = playlist.fid,
+                mid = playlist.mid,
+                bvid = playlist.bvid
             )
         }
     }
@@ -306,6 +315,9 @@ data class SyncFavoritePlaylist(
             browseId = browseId,
             playlistId = playlistId,
             subtitle = subtitle,
+            fid = fid,
+            mid = mid,
+            bvid = bvid,
             songs = songs.map { it.toSongItem() },
             addedTime = addedTime,
             sortOrder = sortOrder,
