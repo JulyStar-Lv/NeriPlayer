@@ -48,6 +48,7 @@ import kotlinx.coroutines.CancellationException
 import moe.ouom.neriplayer.ui.screen.DownloadManagerScreen
 import moe.ouom.neriplayer.ui.screen.DownloadProgressScreen
 import moe.ouom.neriplayer.ui.screen.tab.SettingsScreen
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeMode
 
 private enum class SettingsScreenState {
     Settings,
@@ -61,8 +62,9 @@ private fun SettingsScreenState.saveableKey(): String = "settings_host:${name}"
 fun SettingsHostScreen(
     dynamicColor: Boolean,
     onDynamicColorChange: (Boolean) -> Unit,
+    themeMode: ThemeMode,
     isDarkTheme: Boolean,
-    onThemeToggleRequest: (Offset, Float) -> Unit,
+    onThemeModeRequest: (ThemeMode, Offset, Float) -> Unit,
     preferredQuality: String,
     onQualityChange: (String) -> Unit,
     youtubePreferredQuality: String,
@@ -222,8 +224,9 @@ fun SettingsHostScreen(
                             listState = settingsListState,
                             dynamicColor = dynamicColor,
                             onDynamicColorChange = onDynamicColorChange,
+                            themeMode = themeMode,
                             isDarkTheme = isDarkTheme,
-                            onThemeToggleRequest = onThemeToggleRequest,
+                            onThemeModeRequest = onThemeModeRequest,
                             preferredQuality = preferredQuality,
                             onQualityChange = onQualityChange,
                             youtubePreferredQuality = youtubePreferredQuality,

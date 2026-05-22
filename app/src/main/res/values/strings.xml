@@ -171,6 +171,7 @@
     <string name="settings_dynamic_color_desc">跟随封面主题色</string>
     <string name="settings_theme_toggle_dark">切换到深色主题</string>
     <string name="settings_theme_toggle_light">切换到浅色主题</string>
+    <string name="settings_theme_toggle_auto">切换到跟随系统</string>
     <string name="settings_force_dark">强制深色</string>
     <string name="settings_force_dark_desc">不跟随系统时可手动指定</string>
     <string name="settings_cover_source_badge">封面显示歌曲来源</string>

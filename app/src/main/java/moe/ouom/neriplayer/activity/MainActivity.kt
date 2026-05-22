@@ -215,8 +215,8 @@ class MainActivity : ComponentActivity() {
             val systemDark = isSystemInDarkTheme()
             val useDark = remember(forceDark, followSystemDark, systemDark) {
                 when {
-                    forceDark -> true
                     followSystemDark -> systemDark
+                    forceDark -> true
                     else -> false
                 }
             }

@@ -137,6 +137,7 @@ import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsLyricsOffset
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsMotionSection
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsPlaybackSection
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsStorageCacheSection
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeMode
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeModeActionButton
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeSeedListItem
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.UiScaleListItem
@@ -167,8 +168,9 @@ fun SettingsScreen(
     listState: androidx.compose.foundation.lazy.LazyListState,
     dynamicColor: Boolean,
     onDynamicColorChange: (Boolean) -> Unit,
+    themeMode: ThemeMode,
     isDarkTheme: Boolean,
-    onThemeToggleRequest: (Offset, Float) -> Unit,
+    onThemeModeRequest: (ThemeMode, Offset, Float) -> Unit,
     preferredQuality: String,
     onQualityChange: (String) -> Unit,
     youtubePreferredQuality: String,
@@ -777,8 +779,9 @@ fun SettingsScreen(
                     ) {
                         Text(stringResource(R.string.settings_title))
                         ThemeModeActionButton(
+                            themeMode = themeMode,
                             isDarkTheme = isDarkTheme,
-                            onToggleRequest = onThemeToggleRequest
+                            onModeRequest = onThemeModeRequest
                         )
                     }
                 },

@@ -185,6 +185,8 @@ import moe.ouom.neriplayer.ui.screen.playlist.BiliPlaylistDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.LocalPlaylistDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.NeteaseAlbumDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.NeteasePlaylistDetailScreen
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeMode
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.resolveThemeMode
 import moe.ouom.neriplayer.ui.theme.NeriTheme
 import moe.ouom.neriplayer.ui.view.HyperBackground
 import moe.ouom.neriplayer.ui.viewmodel.debug.LogViewerScreen
@@ -870,10 +872,12 @@ private fun NeriAppContent(
         )
     }
 
-    val isDark = when {
-        forceDark -> true
-        followSystemDark -> isSystemInDarkTheme()
-        else -> false
+    val systemDark = isSystemInDarkTheme()
+    val themeMode = resolveThemeMode(followSystemDark, forceDark)
+    val isDark = when (themeMode) {
+        ThemeMode.Auto -> systemDark
+        ThemeMode.Dark -> true
+        ThemeMode.Light -> false
     }
     SideEffect {
         updateStatusBarIconAppearance(
@@ -897,7 +901,11 @@ private fun NeriAppContent(
         }
     }
 
-    fun requestThemeToggle(originInWindow: Offset, startRadiusPx: Float) {
+    fun requestThemeModeChange(
+        targetMode: ThemeMode,
+        originInWindow: Offset,
+        startRadiusPx: Float
+    ) {
         if (
             themeRevealCaptureInFlight ||
             pendingFollowSystemDark != null ||
@@ -907,7 +915,29 @@ private fun NeriAppContent(
             return
         }
 
-        val nextDark = !isDark
+        val nextFollowSystemDark = targetMode == ThemeMode.Auto
+        val nextForceDark = targetMode == ThemeMode.Dark
+        val nextDark = when (targetMode) {
+            ThemeMode.Auto -> systemDark
+            ThemeMode.Dark -> true
+            ThemeMode.Light -> false
+        }
+
+        if (nextDark == isDark) {
+            pendingFollowSystemDark = nextFollowSystemDark
+            pendingForceDark = nextForceDark
+            scope.launch {
+                try {
+                    repo.setFollowSystemDark(nextFollowSystemDark)
+                    repo.setForceDark(nextForceDark)
+                } finally {
+                    pendingFollowSystemDark = null
+                    pendingForceDark = null
+                }
+            }
+            return
+        }
+
         val activity = context as? Activity
         val captureView = activity?.window?.decorView?.rootView ?: rootView.rootView
         val captureToken = themeRevealCaptureToken + 1
@@ -940,10 +970,10 @@ private fun NeriAppContent(
                 themeRevealStartRadiusPx = startRadiusPx.coerceAtLeast(1f)
             }
             try {
-                pendingFollowSystemDark = false
-                pendingForceDark = nextDark
-                repo.setFollowSystemDark(false)
-                repo.setForceDark(nextDark)
+                pendingFollowSystemDark = nextFollowSystemDark
+                pendingForceDark = nextForceDark
+                repo.setFollowSystemDark(nextFollowSystemDark)
+                repo.setForceDark(nextForceDark)
             } finally {
                 if (themeRevealCaptureToken == captureToken) {
                     themeRevealCaptureJob = null
@@ -1492,8 +1522,9 @@ private fun NeriAppContent(
                                     SettingsHostScreen(
                                         dynamicColor = dynamicColorEnabled,
                                         onDynamicColorChange = { scope.launch { repo.setDynamicColor(it) } },
+                                        themeMode = themeMode,
                                         isDarkTheme = isDark,
-                                        onThemeToggleRequest = ::requestThemeToggle,
+                                        onThemeModeRequest = ::requestThemeModeChange,
                                         preferredQuality = preferredQuality,
                                         onQualityChange = { scope.launch { repo.setAudioQuality(it) } },
                                         youtubePreferredQuality = youtubePreferredQuality,

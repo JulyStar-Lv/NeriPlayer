@@ -171,6 +171,7 @@
     <string name="settings_dynamic_color_desc">Follow cover theme color</string>
     <string name="settings_theme_toggle_dark">Switch to dark theme</string>
     <string name="settings_theme_toggle_light">Switch to light theme</string>
+    <string name="settings_theme_toggle_auto">Switch to system theme</string>
     <string name="settings_force_dark">Force Dark Mode</string>
     <string name="settings_force_dark_desc">Manually specify when not following system</string>
     <string name="settings_cover_source_badge">Show song source on cover</string>
