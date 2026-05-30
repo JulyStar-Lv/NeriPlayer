@@ -302,6 +302,7 @@ class BiliClient(
         val coverUrl: String,
         val intro: String,
         val durationSec: Int,
+        val pageCount: Int,
         val upperMid: Long,
         val upperName: String,
         val play: Long?,
@@ -660,6 +661,7 @@ class BiliClient(
                 coverUrl = ensureHttps(m.optString("cover")),
                 intro = m.optString("intro"),
                 durationSec = m.optInt("duration"),
+                pageCount = m.optBiliPageCount(),
                 upperMid = upper.optLong("mid"),
                 upperName = upper.optString("name"),
                 play = cnt.optLongOrNull("play"),
@@ -706,6 +708,17 @@ class BiliClient(
 
         // 按页码从小到大排序，然后展开并合并列表
         pageResults.sortedBy { it.first }.flatMap { it.second }
+    }
+
+    private fun JSONObject.optBiliPageCount(): Int {
+        val directCount = listOf("page", "pages", "page_count", "videos")
+            .firstNotNullOfOrNull { key -> optInt(key, 0).takeIf { it > 0 } }
+        if (directCount != null) return directCount
+
+        val pagesArrayCount = optJSONArray("pages")?.length()?.takeIf { it > 0 }
+        if (pagesArrayCount != null) return pagesArrayCount
+
+        return 0
     }
 
     suspend fun getAllSeasonArchives(mid: Long, seasonId: Long): List<SeasonArchiveItem> =

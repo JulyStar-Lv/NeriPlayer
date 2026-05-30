@@ -345,8 +345,7 @@ private val SETTINGS_INT_KEYS = listOf(
 )
 
 private val SETTINGS_LONG_KEYS = listOf(
-    SettingsKeys.CLOUD_MUSIC_LYRIC_DEFAULT_OFFSET_MS,
-    SettingsKeys.QQ_MUSIC_LYRIC_DEFAULT_OFFSET_MS,
+    SettingsKeys.LYRIC_DEFAULT_OFFSET_MS,
     SettingsKeys.MAX_CACHE_SIZE_BYTES,
     SettingsKeys.PLAYBACK_FADE_IN_DURATION_MS,
     SettingsKeys.PLAYBACK_FADE_OUT_DURATION_MS,

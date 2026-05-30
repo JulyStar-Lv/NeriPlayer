@@ -229,8 +229,7 @@ import moe.ouom.neriplayer.data.model.sameIdentityAs
 import moe.ouom.neriplayer.data.model.stableKey
 import moe.ouom.neriplayer.data.platform.youtube.extractYouTubeMusicVideoId
 import moe.ouom.neriplayer.data.platform.youtube.isYouTubeMusicSong
-import moe.ouom.neriplayer.data.settings.DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS
-import moe.ouom.neriplayer.data.settings.DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS
+import moe.ouom.neriplayer.data.settings.DEFAULT_LYRIC_DEFAULT_OFFSET_MS
 import moe.ouom.neriplayer.data.settings.LYRIC_DEFAULT_OFFSET_STEP_MS
 import moe.ouom.neriplayer.data.settings.MAX_LYRIC_DEFAULT_OFFSET_MS
 import moe.ouom.neriplayer.data.settings.MAX_LYRIC_FONT_SCALE
@@ -375,12 +374,9 @@ fun NowPlayingScreen(
     val showProgressAudioSpec by settingsRepo
         .nowPlayingProgressShowAudioSpecFlow
         .collectAsState(initial = true)
-    val cloudMusicLyricDefaultOffsetMs by settingsRepo
-        .cloudMusicLyricDefaultOffsetMsFlow
-        .collectAsState(initial = DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS)
-    val qqMusicLyricDefaultOffsetMs by settingsRepo
-        .qqMusicLyricDefaultOffsetMsFlow
-        .collectAsState(initial = DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS)
+    val lyricDefaultOffsetMs by settingsRepo
+        .lyricDefaultOffsetMsFlow
+        .collectAsState(initial = DEFAULT_LYRIC_DEFAULT_OFFSET_MS)
 
     // 订阅当前播放链接
     val currentMediaUrl by PlayerManager.currentMediaUrlFlow.collectAsState()
@@ -691,8 +687,8 @@ fun NowPlayingScreen(
     // 歌词偏移（平台 + 用户自定义）
     val platformOffset = resolveLyricDefaultOffsetMs(
         lyricSource = currentSong?.matchedLyricSource,
-        cloudMusicDefaultOffsetMs = cloudMusicLyricDefaultOffsetMs,
-        qqMusicDefaultOffsetMs = qqMusicLyricDefaultOffsetMs
+        cloudMusicDefaultOffsetMs = lyricDefaultOffsetMs,
+        qqMusicDefaultOffsetMs = lyricDefaultOffsetMs
     )
     val userOffset = currentSong?.userLyricOffsetMs ?: 0L
     val totalOffset = platformOffset + userOffset
@@ -2735,6 +2731,7 @@ fun EditSongInfoSheet(
         ) {
             HapticTextButton(
                 onClick = {
+                    viewModel.prepareForSearch(songName)
                     viewModel.performSearch()
                     showSearchResults = true
                     focusManager.clearFocus()
@@ -2925,6 +2922,33 @@ fun EditSongInfoSheet(
                         Text(stringResource(R.string.action_cancel))
                     }
                 }
+
+                OutlinedTextField(
+                    value = searchState.keyword,
+                    onValueChange = { viewModel.onKeywordChange(it) },
+                    label = { Text(stringResource(R.string.music_auto_fill_custom_title)) },
+                    placeholder = {
+                        Text(stringResource(R.string.music_auto_fill_custom_title_hint))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    trailingIcon = {
+                        HapticIconButton(onClick = {
+                            viewModel.performSearch()
+                            focusManager.clearFocus()
+                        }) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = stringResource(R.string.cd_search)
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        viewModel.performSearch()
+                        focusManager.clearFocus()
+                    })
+                )
 
                 // 平台切换
                 androidx.compose.material3.PrimaryTabRow(

@@ -188,10 +188,8 @@ fun SettingsScreen(
     onLyricBlurEnabledChange: (Boolean) -> Unit,
     lyricBlurAmount: Float,
     onLyricBlurAmountChange: (Float) -> Unit,
-    cloudMusicLyricDefaultOffsetMs: Long,
-    onCloudMusicLyricDefaultOffsetMsChange: (Long) -> Unit,
-    qqMusicLyricDefaultOffsetMs: Long,
-    onQqMusicLyricDefaultOffsetMsChange: (Long) -> Unit,
+    lyricDefaultOffsetMs: Long,
+    onLyricDefaultOffsetMsChange: (Long) -> Unit,
     advancedLyricsEnabled: Boolean,
     onAdvancedLyricsEnabledChange: (Boolean) -> Unit,
     advancedBlurEnabled: Boolean,
@@ -1447,10 +1445,8 @@ fun SettingsScreen(
                       expanded = lyricsOffsetExpanded,
                       arrowRotation = lyricsOffsetArrowRotation,
                       onExpandedChange = { lyricsOffsetExpanded = it },
-                      cloudMusicLyricDefaultOffsetMs = cloudMusicLyricDefaultOffsetMs,
-                      onCloudMusicLyricDefaultOffsetMsChange = onCloudMusicLyricDefaultOffsetMsChange,
-                      qqMusicLyricDefaultOffsetMs = qqMusicLyricDefaultOffsetMs,
-                      onQqMusicLyricDefaultOffsetMsChange = onQqMusicLyricDefaultOffsetMsChange
+                      lyricDefaultOffsetMs = lyricDefaultOffsetMs,
+                      onLyricDefaultOffsetMsChange = onLyricDefaultOffsetMsChange
                   )
               }
 

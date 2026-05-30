@@ -420,6 +420,8 @@
     <string name="music_search_cover">Search Cover</string>
     <string name="music_auto_fill">Auto Fill</string>
     <string name="music_auto_fill_hint">Auto fill info from search results</string>
+    <string name="music_auto_fill_custom_title">Custom song name</string>
+    <string name="music_auto_fill_custom_title_hint">Enter the song name used for auto fill search</string>
     <string name="music_save_changes">Save</string>
     <string name="music_info_saved">Song info saved</string>
     <string name="music_select_result">Select search result</string>
@@ -902,11 +904,8 @@
     <string name="settings_motion">Motion Settings</string>
     <string name="settings_motion_expand">Customize motion effects</string>
     <string name="settings_lyrics_offset">Lyrics Offset</string>
-    <string name="settings_lyrics_offset_expand">Adjust default lyric offsets per source</string>
-    <string name="settings_lyrics_offset_cloud_music">Cloud Music default offset</string>
-    <string name="settings_lyrics_offset_cloud_music_desc">Default offset applied when loading Cloud Music lyrics</string>
-    <string name="settings_lyrics_offset_qq_music">QQ Music default offset</string>
-    <string name="settings_lyrics_offset_qq_music_desc">Default offset applied when loading QQ Music lyrics</string>
+    <string name="settings_lyrics_offset_expand">Adjust the default lyric offset</string>
+    <string name="settings_lyrics_offset_default">Default lyric offset</string>
     <string name="settings_lyrics_offset_value">Current offset: %1$s ms</string>
 
     <!-- Now Playing / Empty State -->
@@ -1367,8 +1366,7 @@
     <string name="library_youtube_music_open_playlist">Open Playlist</string>
     <string name="library_youtube_music_copy_browse_id">Copy Browse ID</string>
     <string name="library_youtube_music_copy_playlist_id">Copy Playlist ID</string>
-    <string name="library_bili_folder_collections">Video list</string>
-    <string name="library_bili_folder_loading">Loading videos…</string>
+    <string name="library_bili_folder_loading">Loading…</string>
     <string name="library_bili_folder_load_failed">Load failed: %1$s</string>
     <string name="library_bili_folder_empty">No videos found in this folder</string>
     <string name="library_bili_collection">Video</string>

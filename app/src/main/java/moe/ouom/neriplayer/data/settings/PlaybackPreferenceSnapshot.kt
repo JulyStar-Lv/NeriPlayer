@@ -61,8 +61,7 @@ private const val PLAYBACK_EQUALIZER_LEVELS_KEY = "playback_equalizer_custom_ban
 private const val PLAYBACK_STOP_ON_BLUETOOTH_KEY = "stop_on_bluetooth_disconnect"
 private const val PLAYBACK_ALLOW_MIXED_KEY = "allow_mixed_playback"
 private const val PLAYBACK_MAX_CACHE_SIZE_BYTES_KEY = "max_cache_size_bytes"
-private const val PLAYBACK_CLOUD_MUSIC_LYRIC_OFFSET_KEY = "cloud_music_lyric_default_offset_ms"
-private const val PLAYBACK_QQ_MUSIC_LYRIC_OFFSET_KEY = "qq_music_lyric_default_offset_ms"
+private const val PLAYBACK_LYRIC_OFFSET_KEY = "lyric_default_offset_ms"
 private const val DEFAULT_MAX_CACHE_SIZE_BYTES = 1024L * 1024 * 1024
 
 data class PlaybackPreferenceSnapshot(
@@ -85,11 +84,13 @@ data class PlaybackPreferenceSnapshot(
     val playbackEqualizerCustomBandLevels: List<Int> = emptyList(),
     val stopOnBluetoothDisconnect: Boolean = true,
     val allowMixedPlayback: Boolean = false,
-    val cloudMusicLyricDefaultOffsetMs: Long = DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS,
-    val qqMusicLyricDefaultOffsetMs: Long = DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS,
+    val cloudMusicLyricDefaultOffsetMs: Long = DEFAULT_LYRIC_DEFAULT_OFFSET_MS,
+    val qqMusicLyricDefaultOffsetMs: Long = DEFAULT_LYRIC_DEFAULT_OFFSET_MS,
     val maxCacheSizeBytes: Long = DEFAULT_MAX_CACHE_SIZE_BYTES
 ) {
     fun sanitized(): PlaybackPreferenceSnapshot {
+        val normalizedLyricDefaultOffsetMs =
+            normalizeLyricDefaultOffsetMs(cloudMusicLyricDefaultOffsetMs)
         return copy(
             audioQuality = audioQuality.trim().ifBlank { "exhigh" },
             youtubeAudioQuality = youtubeAudioQuality.trim().ifBlank { "very_high" },
@@ -103,8 +104,8 @@ data class PlaybackPreferenceSnapshot(
             playbackLoudnessGainMb = normalizePlaybackLoudnessGainMb(playbackLoudnessGainMb),
             playbackEqualizerPreset = playbackEqualizerPreset.trim()
                 .ifBlank { PlaybackEqualizerPresetId.FLAT },
-            cloudMusicLyricDefaultOffsetMs = normalizeLyricDefaultOffsetMs(cloudMusicLyricDefaultOffsetMs),
-            qqMusicLyricDefaultOffsetMs = normalizeLyricDefaultOffsetMs(qqMusicLyricDefaultOffsetMs),
+            cloudMusicLyricDefaultOffsetMs = normalizedLyricDefaultOffsetMs,
+            qqMusicLyricDefaultOffsetMs = normalizedLyricDefaultOffsetMs,
             maxCacheSizeBytes = maxCacheSizeBytes.coerceAtLeast(0L)
         )
     }
@@ -125,15 +126,19 @@ data class PlaybackPreferenceSnapshot(
 suspend fun readPlaybackPreferenceSnapshot(context: Context): PlaybackPreferenceSnapshot {
     readCachedPlaybackPreferenceSnapshot(context)?.let { return it }
 
-    return context.dataStore.data.first().toPlaybackPreferenceSnapshot().also { snapshot ->
+    return runCatching {
+        context.dataStore.data.first().toPlaybackPreferenceSnapshot()
+    }.getOrElse {
+        PlaybackPreferenceSnapshot()
+    }.also { snapshot ->
         persistPlaybackPreferenceSnapshot(context, snapshot)
     }
 }
 
 fun readPlaybackPreferenceSnapshotSync(context: Context): PlaybackPreferenceSnapshot {
-    return readPlaybackPreferenceSnapshotCached(context) ?: runBlocking {
-        readPlaybackPreferenceSnapshot(context)
-    }
+    return readPlaybackPreferenceSnapshotCached(context) ?: runCatching {
+        runBlocking { readPlaybackPreferenceSnapshot(context) }
+    }.getOrElse { PlaybackPreferenceSnapshot() }
 }
 
 fun readPlaybackPreferenceSnapshotCached(context: Context): PlaybackPreferenceSnapshot? {
@@ -201,18 +206,16 @@ internal fun persistPlaybackPreferenceSnapshot(
                 )
                 .putBoolean(PLAYBACK_ALLOW_MIXED_KEY, normalizedSnapshot.allowMixedPlayback)
                 .putLong(
-                    PLAYBACK_CLOUD_MUSIC_LYRIC_OFFSET_KEY,
+                    PLAYBACK_LYRIC_OFFSET_KEY,
                     normalizedSnapshot.cloudMusicLyricDefaultOffsetMs
-                )
-                .putLong(
-                    PLAYBACK_QQ_MUSIC_LYRIC_OFFSET_KEY,
-                    normalizedSnapshot.qqMusicLyricDefaultOffsetMs
                 )
                 .putLong(PLAYBACK_MAX_CACHE_SIZE_BYTES_KEY, normalizedSnapshot.maxCacheSizeBytes)
         }
     }
 
 internal fun Preferences.toPlaybackPreferenceSnapshot(): PlaybackPreferenceSnapshot {
+    val lyricDefaultOffsetMs =
+        this[SettingsKeys.LYRIC_DEFAULT_OFFSET_MS] ?: DEFAULT_LYRIC_DEFAULT_OFFSET_MS
     return PlaybackPreferenceSnapshot(
         audioQuality = this[SettingsKeys.AUDIO_QUALITY] ?: "exhigh",
         youtubeAudioQuality = this[SettingsKeys.YOUTUBE_AUDIO_QUALITY] ?: "very_high",
@@ -239,12 +242,8 @@ internal fun Preferences.toPlaybackPreferenceSnapshot(): PlaybackPreferenceSnaps
         ),
         stopOnBluetoothDisconnect = this[SettingsKeys.STOP_ON_BLUETOOTH_DISCONNECT] ?: true,
         allowMixedPlayback = this[SettingsKeys.ALLOW_MIXED_PLAYBACK] ?: false,
-        cloudMusicLyricDefaultOffsetMs =
-            this[SettingsKeys.CLOUD_MUSIC_LYRIC_DEFAULT_OFFSET_MS]
-                ?: DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS,
-        qqMusicLyricDefaultOffsetMs =
-            this[SettingsKeys.QQ_MUSIC_LYRIC_DEFAULT_OFFSET_MS]
-                ?: DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS,
+        cloudMusicLyricDefaultOffsetMs = lyricDefaultOffsetMs,
+        qqMusicLyricDefaultOffsetMs = lyricDefaultOffsetMs,
         maxCacheSizeBytes =
             this[SettingsKeys.MAX_CACHE_SIZE_BYTES] ?: DEFAULT_MAX_CACHE_SIZE_BYTES
     ).sanitized()
@@ -255,6 +254,8 @@ private fun readCachedPlaybackPreferenceSnapshot(context: Context): PlaybackPref
     if (!prefs.getBoolean(PLAYBACK_SNAPSHOT_READY_KEY, false)) {
         return null
     }
+    val cachedLyricDefaultOffsetMs =
+        prefs.getLong(PLAYBACK_LYRIC_OFFSET_KEY, DEFAULT_LYRIC_DEFAULT_OFFSET_MS)
     return PlaybackPreferenceSnapshot(
         audioQuality = prefs.getString(PLAYBACK_AUDIO_QUALITY_KEY, "exhigh") ?: "exhigh",
         youtubeAudioQuality =
@@ -286,14 +287,8 @@ private fun readCachedPlaybackPreferenceSnapshot(context: Context): PlaybackPref
         ),
         stopOnBluetoothDisconnect = prefs.getBoolean(PLAYBACK_STOP_ON_BLUETOOTH_KEY, true),
         allowMixedPlayback = prefs.getBoolean(PLAYBACK_ALLOW_MIXED_KEY, false),
-        cloudMusicLyricDefaultOffsetMs = prefs.getLong(
-            PLAYBACK_CLOUD_MUSIC_LYRIC_OFFSET_KEY,
-            DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS
-        ),
-        qqMusicLyricDefaultOffsetMs = prefs.getLong(
-            PLAYBACK_QQ_MUSIC_LYRIC_OFFSET_KEY,
-            DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS
-        ),
+        cloudMusicLyricDefaultOffsetMs = cachedLyricDefaultOffsetMs,
+        qqMusicLyricDefaultOffsetMs = cachedLyricDefaultOffsetMs,
         maxCacheSizeBytes = prefs.getLong(
             PLAYBACK_MAX_CACHE_SIZE_BYTES_KEY,
             DEFAULT_MAX_CACHE_SIZE_BYTES

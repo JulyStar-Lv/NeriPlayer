@@ -6,8 +6,7 @@ import kotlin.math.roundToLong
 internal const val MIN_LYRIC_DEFAULT_OFFSET_MS = -2000L
 internal const val MAX_LYRIC_DEFAULT_OFFSET_MS = 2000L
 internal const val LYRIC_DEFAULT_OFFSET_STEP_MS = 50L
-internal const val DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS = 1000L
-internal const val DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS = 500L
+internal const val DEFAULT_LYRIC_DEFAULT_OFFSET_MS = 500L
 
 fun normalizeLyricDefaultOffsetMs(value: Long): Long {
     val stepAligned =

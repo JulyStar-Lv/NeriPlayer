@@ -420,6 +420,8 @@
     <string name="music_search_cover">搜索封面</string>
     <string name="music_auto_fill">自动填充</string>
     <string name="music_auto_fill_hint">从搜索结果自动填充信息</string>
+    <string name="music_auto_fill_custom_title">自定义歌曲名</string>
+    <string name="music_auto_fill_custom_title_hint">输入用于自动填充搜索的歌曲名</string>
     <string name="music_save_changes">保存修改</string>
     <string name="music_info_saved">歌曲信息已保存</string>
     <string name="music_select_result">选择搜索结果</string>
@@ -902,11 +904,8 @@
     <string name="settings_motion">动效设置</string>
     <string name="settings_motion_expand">展开以调整动效表现</string>
     <string name="settings_lyrics_offset">歌词偏移</string>
-    <string name="settings_lyrics_offset_expand">展开以调整各歌词来源默认偏移</string>
-    <string name="settings_lyrics_offset_cloud_music">网易云默认歌词偏移</string>
-    <string name="settings_lyrics_offset_cloud_music_desc">设置加载网易云歌词时的基础偏移</string>
-    <string name="settings_lyrics_offset_qq_music">QQ 音乐默认歌词偏移</string>
-    <string name="settings_lyrics_offset_qq_music_desc">设置加载 QQ 音乐歌词时的基础偏移</string>
+    <string name="settings_lyrics_offset_expand">展开以调整默认歌词偏移</string>
+    <string name="settings_lyrics_offset_default">默认歌词偏移</string>
     <string name="settings_lyrics_offset_value">当前偏移：%1$s ms</string>
 
     <!-- Now Playing / Empty State -->
@@ -1382,8 +1381,7 @@
     <string name="library_youtube_music_open_playlist">打开歌单</string>
     <string name="library_youtube_music_copy_browse_id">复制 Browse ID</string>
     <string name="library_youtube_music_copy_playlist_id">复制 Playlist ID</string>
-    <string name="library_bili_folder_collections">视频清单</string>
-    <string name="library_bili_folder_loading">正在加载视频清单…</string>
+    <string name="library_bili_folder_loading">正在加载…</string>
     <string name="library_bili_folder_load_failed">加载失败：%1$s</string>
     <string name="library_bili_folder_empty">这个文件夹里暂未找到视频</string>
     <string name="library_bili_collection">视频</string>

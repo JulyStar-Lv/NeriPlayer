@@ -61,10 +61,8 @@ internal fun SettingsLyricsOffsetSection(
     expanded: Boolean,
     arrowRotation: Float,
     onExpandedChange: (Boolean) -> Unit,
-    cloudMusicLyricDefaultOffsetMs: Long,
-    onCloudMusicLyricDefaultOffsetMsChange: (Long) -> Unit,
-    qqMusicLyricDefaultOffsetMs: Long,
-    onQqMusicLyricDefaultOffsetMsChange: (Long) -> Unit
+    lyricDefaultOffsetMs: Long,
+    onLyricDefaultOffsetMsChange: (Long) -> Unit
 ) {
     ExpandableHeader(
         icon = Icons.Outlined.Subtitles,
@@ -83,17 +81,9 @@ internal fun SettingsLyricsOffsetSection(
                 .padding(start = 16.dp, end = 8.dp, bottom = 8.dp)
         ) {
             LyricsOffsetSliderListItem(
-                title = stringResource(R.string.settings_lyrics_offset_cloud_music),
-                description = stringResource(R.string.settings_lyrics_offset_cloud_music_desc),
-                offsetMs = cloudMusicLyricDefaultOffsetMs,
-                onOffsetChange = onCloudMusicLyricDefaultOffsetMsChange
-            )
-            Spacer(Modifier.height(4.dp))
-            LyricsOffsetSliderListItem(
-                title = stringResource(R.string.settings_lyrics_offset_qq_music),
-                description = stringResource(R.string.settings_lyrics_offset_qq_music_desc),
-                offsetMs = qqMusicLyricDefaultOffsetMs,
-                onOffsetChange = onQqMusicLyricDefaultOffsetMsChange
+                title = stringResource(R.string.settings_lyrics_offset_default),
+                offsetMs = lyricDefaultOffsetMs,
+                onOffsetChange = onLyricDefaultOffsetMsChange
             )
         }
     }
@@ -102,7 +92,6 @@ internal fun SettingsLyricsOffsetSection(
 @Composable
 private fun LyricsOffsetSliderListItem(
     title: String,
-    description: String,
     offsetMs: Long,
     onOffsetChange: (Long) -> Unit
 ) {
@@ -118,12 +107,6 @@ private fun LyricsOffsetSliderListItem(
         headlineContent = { Text(title) },
         supportingContent = {
             Column(Modifier.fillMaxWidth()) {
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
                 Text(
                     text = stringResource(
                         R.string.settings_lyrics_offset_value,

@@ -116,6 +116,8 @@ import moe.ouom.neriplayer.data.auth.common.SavedCookieAuthState
 import moe.ouom.neriplayer.data.auth.youtube.YouTubeAuthState
 import moe.ouom.neriplayer.data.playlist.favorite.FavoritePlaylist
 import moe.ouom.neriplayer.data.playlist.favorite.FavoritePlaylistRepository
+import moe.ouom.neriplayer.data.playlist.source.SourceLibraryItem
+import moe.ouom.neriplayer.data.playlist.source.SourceLibraryRepository
 import moe.ouom.neriplayer.data.local.playlist.system.FavoritesPlaylist
 import moe.ouom.neriplayer.data.local.playlist.system.LocalFilesPlaylist
 import moe.ouom.neriplayer.data.local.playlist.model.LocalPlaylist
@@ -201,7 +203,7 @@ private data class SourcePlaylistImportItem(
     val bvid: String? = null
 )
 
-private val LibraryAuthPlatform.favoriteSource: String?
+private val LibraryAuthPlatform.sourceLibrarySource: String?
     get() = when (this) {
         LibraryAuthPlatform.NETEASE -> "netease"
         LibraryAuthPlatform.YOUTUBE -> "youtubeMusic"
@@ -211,23 +213,17 @@ private val LibraryAuthPlatform.favoriteSource: String?
 
 private fun sourceImportKey(source: String, id: Long): String = "$source:$id"
 
-private fun libraryTabDisplayOrder(isInternational: Boolean): List<LibraryTab> {
-    return if (isInternational) {
-        listOf(
-            LibraryTab.LOCAL,
-            LibraryTab.FAVORITE,
-            LibraryTab.YTMUSIC,
-            LibraryTab.NETEASE,
-            LibraryTab.BILI
-        )
-    } else {
-        listOf(
-            LibraryTab.LOCAL,
-            LibraryTab.FAVORITE,
-            LibraryTab.NETEASE,
-            LibraryTab.YTMUSIC,
-            LibraryTab.BILI
-        )
+private fun libraryTabDisplayOrder(
+    showNetease: Boolean,
+    showBili: Boolean,
+    showYouTubeMusic: Boolean
+): List<LibraryTab> {
+    return buildList {
+        add(LibraryTab.LOCAL)
+        add(LibraryTab.FAVORITE)
+        if (showNetease) add(LibraryTab.NETEASE)
+        if (showBili) add(LibraryTab.BILI)
+        if (showYouTubeMusic) add(LibraryTab.YTMUSIC)
     }
 }
 
@@ -259,21 +255,10 @@ fun LibraryScreen(
     val biliAuthUiState by biliVm.uiState.collectAsState()
     val youtubeAuthUiState by youtubeVm.uiState.collectAsState()
     val context = LocalContext.current
-    val favoriteRepo = remember(context) { FavoritePlaylistRepository.getInstance(context) }
-    val importedFavorites by favoriteRepo.favorites.collectAsState()
+    val sourceLibraryRepo = remember(context) { SourceLibraryRepository.getInstance(context) }
+    val sourceLibraryItems by sourceLibraryRepo.items.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val defaultPlaylistName = stringResource(R.string.library_create_playlist_default)
-    val isInternational by AppContainer.settingsRepo.internationalizationEnabledFlow
-        .collectAsState(initial = false)
-    val orderedTabs = remember(isInternational) { libraryTabDisplayOrder(isInternational) }
-    val initialPage = remember(orderedTabs, initialTab) {
-        orderedTabs.indexOf(initialTab).takeIf { it >= 0 } ?: 0
-    }
-
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { orderedTabs.size }
-    )
     val scope = rememberCoroutineScope()
     var showPlatformAccountPage by rememberSaveable { mutableStateOf(false) }
     var inlineMsg by remember { mutableStateOf<String?>(null) }
@@ -296,6 +281,65 @@ fun LibraryScreen(
     var youtubeCookieText by remember { mutableStateOf("") }
     var manageSourcePlatform by remember { mutableStateOf<LibraryAuthPlatform?>(null) }
     var selectedBiliFolder by rememberSaveable { mutableStateOf<BiliPlaylist?>(null) }
+
+    val neteasePlaylistAuth = savedCookiePlatformAuthUiState(
+        platform = LibraryAuthPlatform.NETEASE,
+        title = stringResource(R.string.platform_netease),
+        iconResId = R.drawable.ic_netease_cloud_music,
+        healthState = neteaseAuthUiState.health.state,
+        savedAt = neteaseAuthUiState.health.savedAt,
+        hasSavedCookies = neteaseAuthUiState.hasSavedCookies,
+        validStatusResId = R.string.settings_netease_status_valid,
+        savedInvalidResId = R.string.settings_netease_status_saved_invalid,
+        missingResId = R.string.settings_netease_status_missing,
+        emptyHint = stringResource(R.string.library_platform_empty_netease_playlist)
+    )
+    val biliAuth = savedCookiePlatformAuthUiState(
+        platform = LibraryAuthPlatform.BILI,
+        title = stringResource(R.string.platform_bilibili),
+        iconResId = R.drawable.ic_bilibili,
+        healthState = biliAuthUiState.health.state,
+        savedAt = biliAuthUiState.health.savedAt,
+        hasSavedCookies = biliAuthUiState.hasSavedCookies,
+        validStatusResId = R.string.settings_bili_status_valid,
+        savedInvalidResId = R.string.settings_bili_status_saved_invalid,
+        missingResId = R.string.settings_bili_status_missing,
+        emptyHint = stringResource(R.string.library_platform_empty_bilibili)
+    )
+    val youtubeAuth = youtubePlatformAuthUiState(
+        title = stringResource(R.string.common_youtube),
+        healthState = youtubeAuthUiState.health.state,
+        savedAt = youtubeAuthUiState.health.savedAt,
+        hasSavedAuth = youtubeAuthUiState.hasSavedAuth
+    )
+    val orderedTabs = remember(
+        neteasePlaylistAuth.connectionState,
+        biliAuth.connectionState,
+        youtubeAuth.connectionState
+    ) {
+        libraryTabDisplayOrder(
+            showNetease = neteasePlaylistAuth.connectionState == PlatformConnectionState.Connected,
+            showBili = biliAuth.connectionState == PlatformConnectionState.Connected,
+            showYouTubeMusic = youtubeAuth.connectionState == PlatformConnectionState.Connected
+        )
+    }
+    val initialPage = remember(orderedTabs, initialTab) {
+        orderedTabs.indexOf(initialTab).takeIf { it >= 0 } ?: 0
+    }
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { orderedTabs.size }
+    )
+    val platformAuthStates = listOf(neteasePlaylistAuth, biliAuth, youtubeAuth)
+    val displayedNeteasePlaylists = remember(sourceLibraryItems, ui.neteasePlaylists) {
+        selectedNeteasePlaylists(sourceLibraryItems, ui.neteasePlaylists)
+    }
+    val displayedYouTubeMusicPlaylists = remember(sourceLibraryItems, ui.youtubeMusicPlaylists) {
+        selectedYouTubeMusicPlaylists(sourceLibraryItems, ui.youtubeMusicPlaylists)
+    }
+    val displayedBiliPlaylists = remember(sourceLibraryItems) {
+        selectedBiliPlaylists(sourceLibraryItems)
+    }
 
     fun openNeteaseAuth(tab: Int = 0) {
         inlineMsg = null
@@ -346,7 +390,8 @@ fun LibraryScreen(
     }
 
     LaunchedEffect(initialTab, orderedTabs) {
-        val targetPage = orderedTabs.indexOf(initialTab).takeIf { it >= 0 } ?: 0
+        val targetPage = orderedTabs.indexOf(initialTab).takeIf { it >= 0 }
+            ?: pagerState.currentPage.coerceIn(0, orderedTabs.lastIndex)
         if (pagerState.currentPage != targetPage) {
             pagerState.scrollToPage(targetPage)
         }
@@ -454,37 +499,6 @@ fun LibraryScreen(
         }
     }
 
-    val neteasePlaylistAuth = savedCookiePlatformAuthUiState(
-        platform = LibraryAuthPlatform.NETEASE,
-        title = stringResource(R.string.platform_netease),
-        iconResId = R.drawable.ic_netease_cloud_music,
-        healthState = neteaseAuthUiState.health.state,
-        savedAt = neteaseAuthUiState.health.savedAt,
-        hasSavedCookies = neteaseAuthUiState.hasSavedCookies,
-        validStatusResId = R.string.settings_netease_status_valid,
-        savedInvalidResId = R.string.settings_netease_status_saved_invalid,
-        missingResId = R.string.settings_netease_status_missing,
-        emptyHint = stringResource(R.string.library_platform_empty_netease_playlist)
-    )
-    val biliAuth = savedCookiePlatformAuthUiState(
-        platform = LibraryAuthPlatform.BILI,
-        title = stringResource(R.string.platform_bilibili),
-        iconResId = R.drawable.ic_bilibili,
-        healthState = biliAuthUiState.health.state,
-        savedAt = biliAuthUiState.health.savedAt,
-        hasSavedCookies = biliAuthUiState.hasSavedCookies,
-        validStatusResId = R.string.settings_bili_status_valid,
-        savedInvalidResId = R.string.settings_bili_status_saved_invalid,
-        missingResId = R.string.settings_bili_status_missing,
-        emptyHint = stringResource(R.string.library_platform_empty_bilibili)
-    )
-    val youtubeAuth = youtubePlatformAuthUiState(
-        title = stringResource(R.string.common_youtube),
-        healthState = youtubeAuthUiState.health.state,
-        savedAt = youtubeAuthUiState.health.savedAt,
-        hasSavedAuth = youtubeAuthUiState.hasSavedAuth
-    )
-    val platformAuthStates = listOf(neteasePlaylistAuth, youtubeAuth, biliAuth)
     val hasConnectedPlatform = platformAuthStates.any {
         it.connectionState == PlatformConnectionState.Connected
     }
@@ -567,15 +581,16 @@ fun LibraryScreen(
                     .fillMaxSize()
             ) {
                 Column(Modifier.fillMaxSize()) {
+                    val selectedTabIndex = pagerState.currentPage.coerceIn(0, orderedTabs.lastIndex)
                     PrimaryScrollableTabRow(
-                        selectedTabIndex = pagerState.currentPage,
+                        selectedTabIndex = selectedTabIndex,
                         edgePadding = 8.dp,
                         containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.primary
                     ) {
                         orderedTabs.forEachIndexed { index, tab ->
                             Tab(
-                                selected = pagerState.currentPage == index,
+                                selected = selectedTabIndex == index,
                                 onClick = {
                                     scope.launch {
                                         pagerState.animateScrollToPage(index)
@@ -623,8 +638,8 @@ fun LibraryScreen(
 
                             LibraryTab.NETEASE,
                             LibraryTab.NETEASEALBUM -> NeteaseLibraryList(
-                                playlists = ui.neteasePlaylists,
-                                albums = ui.neteaseAlbums,
+                                playlists = displayedNeteasePlaylists,
+                                albums = emptyList(),
                                 listState = neteaseListState,
                                 authUiState = neteasePlaylistAuth,
                                 onPlaylistClick = onNeteasePlaylistClick,
@@ -633,7 +648,7 @@ fun LibraryScreen(
                             )
 
                             LibraryTab.YTMUSIC -> YouTubeMusicPlaylistList(
-                                playlists = ui.youtubeMusicPlaylists,
+                                playlists = displayedYouTubeMusicPlaylists,
                                 error = ui.youtubeMusicError,
                                 listState = youtubeMusicListState,
                                 authUiState = youtubeAuth,
@@ -646,10 +661,16 @@ fun LibraryScreen(
                                 val folder = selectedBiliFolder
                                 if (folder == null) {
                                     BiliPlaylistList(
-                                        playlists = ui.biliPlaylists,
+                                        playlists = displayedBiliPlaylists,
                                         listState = biliListState,
                                         authUiState = biliAuth,
-                                        onClick = { selectedBiliFolder = it },
+                                        onClick = { playlist ->
+                                            if (playlist.fid == BILI_SINGLE_VIDEO_FID) {
+                                                onBiliPlaylistClick(playlist)
+                                            } else {
+                                                selectedBiliFolder = playlist
+                                            }
+                                        },
                                         onAuthAction = { openBiliAuth() }
                                     )
                                 } else {
@@ -683,8 +704,8 @@ fun LibraryScreen(
                     authUiState = authUiState,
                     folders = ui.biliPlaylists,
                     ui = ui,
-                    favorites = importedFavorites,
-                    favoriteRepo = favoriteRepo,
+                    sourceItems = sourceLibraryItems,
+                    sourceLibraryRepo = sourceLibraryRepo,
                     onLoadFolder = vm::refreshBiliFolderCollections,
                     onDismiss = { manageSourcePlatform = null }
                 )
@@ -692,8 +713,8 @@ fun LibraryScreen(
                 SourcePlaylistImportSheet(
                     authUiState = authUiState,
                     importItems = sourcePlaylistImportItems(platform, ui),
-                    favorites = importedFavorites,
-                    favoriteRepo = favoriteRepo,
+                    sourceItems = sourceLibraryItems,
+                    sourceLibraryRepo = sourceLibraryRepo,
                     onDismiss = { manageSourcePlatform = null }
                 )
             }
@@ -1015,23 +1036,106 @@ private fun sourcePlaylistImportItems(
     }
 }
 
+private fun selectedNeteasePlaylists(
+    sourceItems: List<SourceLibraryItem>,
+    livePlaylists: List<PlaylistSummary>
+): List<PlaylistSummary> {
+    val liveById = livePlaylists.associateBy { it.id }
+    return sourceItems
+        .filter { it.source == "netease" }
+        .map { item ->
+            liveById[item.id] ?: PlaylistSummary(
+                id = item.id,
+                name = item.name,
+                picUrl = item.coverUrl.orEmpty(),
+                playCount = 0,
+                trackCount = item.trackCount
+            )
+        }
+}
+
+private fun selectedYouTubeMusicPlaylists(
+    sourceItems: List<SourceLibraryItem>,
+    livePlaylists: List<YouTubeMusicPlaylist>
+): List<YouTubeMusicPlaylist> {
+    val liveById = livePlaylists.associateBy { it.favoriteId() }
+    return sourceItems
+        .filter { it.source == "youtubeMusic" }
+        .mapNotNull { item ->
+            liveById[item.id] ?: run {
+                val browseId = item.browseId
+                    ?.takeIf { it.isNotBlank() }
+                    ?: item.playlistId
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { "VL$it" }
+                val playlistId = item.playlistId
+                    ?.takeIf { it.isNotBlank() }
+                    ?: browseId?.removePrefix("VL")
+                if (browseId.isNullOrBlank() || playlistId.isNullOrBlank()) {
+                    null
+                } else {
+                    YouTubeMusicPlaylist(
+                        browseId = browseId,
+                        playlistId = playlistId,
+                        title = item.name,
+                        subtitle = item.subtitle.orEmpty(),
+                        coverUrl = item.coverUrl.orEmpty(),
+                        trackCount = item.trackCount
+                    )
+                }
+            }
+        }
+}
+
+private fun selectedBiliPlaylists(sourceItems: List<SourceLibraryItem>): List<BiliPlaylist> {
+    return sourceItems
+        .filter { it.source == "bili" }
+        .map { item ->
+            BiliPlaylist(
+                mediaId = item.id,
+                fid = item.fid ?: if (!item.bvid.isNullOrBlank()) BILI_SINGLE_VIDEO_FID else 0L,
+                mid = item.mid ?: 0L,
+                title = item.name,
+                count = item.trackCount,
+                coverUrl = item.coverUrl.orEmpty(),
+                bvid = item.bvid.orEmpty()
+            )
+        }
+}
+
+private fun SourcePlaylistImportItem.toSourceLibraryItem(): SourceLibraryItem {
+    return SourceLibraryItem(
+        id = id,
+        name = title,
+        coverUrl = coverUrl,
+        trackCount = trackCount,
+        source = source,
+        browseId = browseId,
+        playlistId = playlistId,
+        subtitle = subtitle,
+        fid = fid,
+        mid = mid,
+        bvid = bvid
+    )
+}
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun SourcePlaylistImportSheet(
     authUiState: PlatformAuthUiState,
     importItems: List<SourcePlaylistImportItem>,
-    favorites: List<FavoritePlaylist>,
-    favoriteRepo: FavoritePlaylistRepository,
+    sourceItems: List<SourceLibraryItem>,
+    sourceLibraryRepo: SourceLibraryRepository,
     onDismiss: () -> Unit
 ) {
-    val favoriteSource = authUiState.platform.favoriteSource ?: return
+    val source = authUiState.platform.sourceLibrarySource ?: return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val itemKeys = remember(importItems) { importItems.map { it.key }.toSet() }
-    val importedKeys = remember(favorites, favoriteSource, itemKeys) {
-        favorites
-            .filter { it.source == favoriteSource }
+    val importedKeys = remember(sourceItems, source, itemKeys) {
+        sourceItems
+            .filter { it.source == source }
             .map { sourceImportKey(it.source, it.id) }
             .filter { it in itemKeys }
             .toSet()
@@ -1192,30 +1296,11 @@ private fun SourcePlaylistImportSheet(
                     enabled = importItems.isNotEmpty(),
                     onClick = {
                         val selectedItems = importItems.filter { it.key in selectedKeys }
-                        val visibleFavorites = favorites.filter { favorite ->
-                            favorite.source == favoriteSource &&
-                                sourceImportKey(favorite.source, favorite.id) in itemKeys
-                        }
                         scope.launch {
-                            visibleFavorites
-                                .filterNot { sourceImportKey(it.source, it.id) in selectedKeys }
-                                .forEach { favoriteRepo.removeFavorite(it.id, it.source) }
-                            selectedItems.forEach { item ->
-                                favoriteRepo.addFavorite(
-                                    id = item.id,
-                                    name = item.title,
-                                    coverUrl = item.coverUrl,
-                                    trackCount = item.trackCount,
-                                    source = item.source,
-                                    browseId = item.browseId,
-                                    playlistId = item.playlistId,
-                                    subtitle = item.subtitle,
-                                    fid = item.fid,
-                                    mid = item.mid,
-                                    bvid = item.bvid,
-                                    songs = emptyList()
-                                )
-                            }
+                            sourceLibraryRepo.replaceSourceItems(
+                                source = source,
+                                selectedItems = selectedItems.map { it.toSourceLibraryItem() }
+                            )
                             Toast.makeText(
                                 context,
                                 context.getString(R.string.library_source_import_updated),
@@ -1238,12 +1323,12 @@ private fun BiliSourcePlaylistImportSheet(
     authUiState: PlatformAuthUiState,
     folders: List<BiliPlaylist>,
     ui: LibraryUiState,
-    favorites: List<FavoritePlaylist>,
-    favoriteRepo: FavoritePlaylistRepository,
+    sourceItems: List<SourceLibraryItem>,
+    sourceLibraryRepo: SourceLibraryRepository,
     onLoadFolder: (BiliPlaylist) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val favoriteSource = "bili"
+    val source = "bili"
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1255,12 +1340,12 @@ private fun BiliSourcePlaylistImportSheet(
     val importItems = remember(collections) {
         collections.map { playlist ->
             SourcePlaylistImportItem(
-                key = sourceImportKey(favoriteSource, playlist.mediaId),
+                key = sourceImportKey(source, playlist.mediaId),
                 id = playlist.mediaId,
                 title = playlist.title,
                 coverUrl = playlist.coverUrl,
                 trackCount = playlist.count,
-                source = favoriteSource,
+                source = source,
                 fid = playlist.fid,
                 mid = playlist.mid,
                 bvid = playlist.bvid
@@ -1268,9 +1353,9 @@ private fun BiliSourcePlaylistImportSheet(
         }
     }
     val itemKeys = remember(importItems) { importItems.map { it.key }.toSet() }
-    val importedKeys = remember(favorites, itemKeys) {
-        favorites
-            .filter { it.source == favoriteSource }
+    val importedKeys = remember(sourceItems, itemKeys) {
+        sourceItems
+            .filter { it.source == source }
             .map { sourceImportKey(it.source, it.id) }
             .filter { it in itemKeys }
             .toSet()
@@ -1550,27 +1635,14 @@ private fun BiliSourcePlaylistImportSheet(
                         enabled = importItems.isNotEmpty(),
                         onClick = {
                             val selectedItems = importItems.filter { it.key in selectedKeys }
-                            val visibleFavorites = favorites.filter { favorite ->
-                                favorite.source == favoriteSource &&
-                                    sourceImportKey(favorite.source, favorite.id) in itemKeys
-                            }
                             scope.launch {
-                                visibleFavorites
-                                    .filterNot { sourceImportKey(it.source, it.id) in selectedKeys }
-                                    .forEach { favoriteRepo.removeFavorite(it.id, it.source) }
-                                selectedItems.forEach { item ->
-                                    favoriteRepo.addFavorite(
-                                        id = item.id,
-                                        name = item.title,
-                                        coverUrl = item.coverUrl,
-                                        trackCount = item.trackCount,
-                                        source = item.source,
-                                        fid = item.fid,
-                                        mid = item.mid,
-                                        bvid = item.bvid,
-                                        songs = emptyList()
-                                    )
+                                val retainedItems = sourceItems.filter { item ->
+                                    item.source == source && sourceImportKey(item.source, item.id) !in itemKeys
                                 }
+                                sourceLibraryRepo.replaceSourceItems(
+                                    source = source,
+                                    selectedItems = retainedItems + selectedItems.map { it.toSourceLibraryItem() }
+                                )
                                 Toast.makeText(
                                     context,
                                     context.getString(R.string.library_source_import_updated),
@@ -1926,12 +1998,6 @@ private fun BiliFolderCollectionList(
                             overflow = TextOverflow.Ellipsis
                         )
                     },
-                    supportingContent = {
-                        Text(
-                            text = stringResource(R.string.library_bili_folder_collections),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     leadingContent = {
                         HapticIconButton(onClick = onNavigateUp) {
@@ -2019,12 +2085,6 @@ private fun BiliFolderCollectionList(
                             text = collection.title,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    supportingContent = {
-                        Text(
-                            text = stringResource(R.string.library_bili_collection),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),

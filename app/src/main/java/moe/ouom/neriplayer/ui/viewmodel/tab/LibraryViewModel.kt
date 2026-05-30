@@ -44,7 +44,8 @@ import moe.ouom.neriplayer.util.NPLogger
 import org.json.JSONObject
 import java.io.IOException
 
-private const val BILI_VIDEO_INFO_BATCH_SIZE = 4
+private const val BILI_FOLDER_PAGE_SIZE = 20
+private const val BILI_FOLDER_PAGE_FETCH_BATCH_SIZE = 4
 
 /** 媒体库页面 UI 状态 */
 data class LibraryUiState(
@@ -201,6 +202,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun refreshBiliFolderCollections(folder: BiliPlaylist) {
         val folderId = folder.mediaId
         if (_uiState.value.biliFolderCollectionLoading.contains(folderId)) return
+        if (_uiState.value.biliFolderCollections.containsKey(folderId)) return
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
@@ -209,21 +211,62 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             )
 
             try {
-                val mapped = withContext(Dispatchers.IO) {
-                    val videoItems = biliClient.getAllFavFolderItems(folderId)
-                        .filter { item -> item.type == 2 }
+                val firstPage = withContext(Dispatchers.IO) {
+                    biliClient.getFavFolderContents(
+                        mediaId = folderId,
+                        page = 1,
+                        pageSize = BILI_FOLDER_PAGE_SIZE
+                    )
+                }
+                val totalPages = ((firstPage.info.count + BILI_FOLDER_PAGE_SIZE - 1) /
+                    BILI_FOLDER_PAGE_SIZE).coerceAtLeast(1)
+                val mapped = firstPage.items.toBiliImportPlaylists()
+                val allPlaylists = mapped.toMutableList()
 
-                    videoItems
-                        .chunked(BILI_VIDEO_INFO_BATCH_SIZE)
-                        .flatMap { batch ->
-                            batch
-                                .map { item -> async { item.toBiliImportPlaylist() } }
-                                .awaitAll()
+                _uiState.value = _uiState.value.copy(
+                    biliFolderCollections = _uiState.value.biliFolderCollections + (folderId to mapped)
+                )
+
+                if (totalPages > 1) {
+                    (2..totalPages)
+                        .chunked(BILI_FOLDER_PAGE_FETCH_BATCH_SIZE)
+                        .forEach { batch ->
+                            val pageResults = withContext(Dispatchers.IO) {
+                                batch.map { page ->
+                                    async {
+                                        page to runCatching {
+                                            biliClient.getFavFolderContents(
+                                                mediaId = folderId,
+                                                page = page,
+                                                pageSize = BILI_FOLDER_PAGE_SIZE
+                                            ).items
+                                        }.getOrElse { error ->
+                                            NPLogger.e(
+                                                "LibraryViewModel-Bili",
+                                                "Failed to fetch page $page for mediaId $folderId",
+                                                error
+                                            )
+                                            emptyList()
+                                        }
+                                    }
+                                }.awaitAll()
+                            }
+                            val nextPlaylists = pageResults
+                                .sortedBy { it.first }
+                                .flatMap { it.second.toBiliImportPlaylists() }
+                            if (nextPlaylists.isNotEmpty()) {
+                                allPlaylists += nextPlaylists
+                                _uiState.value = _uiState.value.copy(
+                                    biliFolderCollections = _uiState.value.biliFolderCollections +
+                                        (folderId to allPlaylists.toList())
+                                )
+                            }
                         }
                 }
 
                 _uiState.value = _uiState.value.copy(
-                    biliFolderCollections = _uiState.value.biliFolderCollections + (folderId to mapped),
+                    biliFolderCollections = _uiState.value.biliFolderCollections +
+                        (folderId to allPlaylists.toList()),
                     biliFolderCollectionLoading = _uiState.value.biliFolderCollectionLoading - folderId,
                     biliFolderCollectionErrors = _uiState.value.biliFolderCollectionErrors - folderId
                 )
@@ -241,26 +284,21 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private suspend fun BiliClient.FavResourceItem.toBiliImportPlaylist(): BiliPlaylist {
-        val itemBvid = bvid.orEmpty()
-        val videoInfo = runCatching {
-            if (itemBvid.isNotBlank()) {
-                biliClient.getVideoBasicInfoByBvid(itemBvid)
-            } else {
-                biliClient.getVideoBasicInfoByAvid(id)
-            }
-        }.getOrNull()
+    private fun List<BiliClient.FavResourceItem>.toBiliImportPlaylists(): List<BiliPlaylist> {
+        return mapNotNull { item ->
+            if (item.type == 2) item.toBiliImportPlaylist() else null
+        }
+    }
 
+    private fun BiliClient.FavResourceItem.toBiliImportPlaylist(): BiliPlaylist {
         return BiliPlaylist(
             mediaId = id,
             fid = BILI_SINGLE_VIDEO_FID,
-            mid = videoInfo?.ownerMid ?: upperMid,
-            title = normalizeBiliPlaylistTitle(
-                videoInfo?.title?.takeIf { it.isNotBlank() } ?: title
-            ),
-            count = videoInfo?.pages?.size?.takeIf { it > 0 } ?: 1,
-            coverUrl = (videoInfo?.coverUrl ?: coverUrl).replace("http://", "https://"),
-            bvid = videoInfo?.bvid?.takeIf { it.isNotBlank() } ?: itemBvid
+            mid = upperMid,
+            title = normalizeBiliPlaylistTitle(title),
+            count = pageCount.takeIf { it > 0 } ?: 1,
+            coverUrl = coverUrl.replace("http://", "https://"),
+            bvid = bvid.orEmpty()
         )
     }
 
