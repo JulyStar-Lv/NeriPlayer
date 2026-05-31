@@ -38,6 +38,7 @@ object SettingsKeys {
     val FORCE_DARK = booleanPreferencesKey("force_dark")
     val FOLLOW_SYSTEM_DARK = booleanPreferencesKey("follow_system_dark")
     val SHOW_COVER_SOURCE_BADGE = booleanPreferencesKey("show_cover_source_badge")
+    val NOWPLAYING_KEEP_SCREEN_ON = booleanPreferencesKey("nowplaying_keep_screen_on")
     val NOWPLAYING_SHOW_TITLE = booleanPreferencesKey("nowplaying_show_title")
     val NOWPLAYING_PROGRESS_SHOW_QUALITY_SWITCH =
         booleanPreferencesKey("nowplaying_progress_show_quality_switch")

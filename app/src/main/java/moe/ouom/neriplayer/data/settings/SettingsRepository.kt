@@ -60,6 +60,9 @@ class SettingsRepository(private val context: Context) {
     val nowPlayingToolbarDockEnabledFlow: Flow<Boolean> =
         flowOf(false)
 
+    val nowPlayingKeepScreenOnFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[SettingsKeys.NOWPLAYING_KEEP_SCREEN_ON] ?: true }
+
     val nowPlayingShowTitleFlow: Flow<Boolean> =
         context.dataStore.data.map { it[SettingsKeys.NOWPLAYING_SHOW_TITLE] ?: true }
 
@@ -303,6 +306,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setShowCoverSourceBadge(enabled: Boolean) {
         context.dataStore.edit { it[SettingsKeys.SHOW_COVER_SOURCE_BADGE] = enabled }
+    }
+
+    suspend fun setNowPlayingKeepScreenOn(enabled: Boolean) {
+        context.dataStore.edit { it[SettingsKeys.NOWPLAYING_KEEP_SCREEN_ON] = enabled }
     }
 
     suspend fun setNowPlayingShowTitle(enabled: Boolean) {

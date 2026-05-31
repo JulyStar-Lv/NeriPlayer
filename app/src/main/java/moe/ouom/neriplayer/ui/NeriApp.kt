@@ -36,6 +36,7 @@ import android.os.Looper
 import android.view.PixelCopy
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.EaseInOutCubic
@@ -577,6 +578,7 @@ private fun NeriAppContent(
     val backgroundImageAlpha by repo.backgroundImageAlphaFlow.collectAsState(initial = 0.3f)
     val hapticFeedbackEnabled by repo.hapticFeedbackEnabledFlow.collectAsState(initial = true)
     val showCoverSourceBadge by repo.showCoverSourceBadgeFlow.collectAsState(initial = true)
+    val nowPlayingKeepScreenOn by repo.nowPlayingKeepScreenOnFlow.collectAsState(initial = true)
     val showNowPlayingTitle by repo.nowPlayingShowTitleFlow.collectAsState(initial = true)
     val showNowPlayingProgressQualitySwitch by repo.nowPlayingProgressShowQualitySwitchFlow.collectAsState(initial = true)
     val showNowPlayingProgressAudioCodec by repo.nowPlayingProgressShowAudioCodecFlow.collectAsState(initial = true)
@@ -1044,6 +1046,22 @@ private fun NeriAppContent(
             DisposableEffect(showNowPlaying, effectiveAudioReactiveEnabled) {
                 AudioReactive.enabled = showNowPlaying && effectiveAudioReactiveEnabled
                 onDispose { AudioReactive.enabled = false }
+            }
+
+            val activity = remember(context) { context.findActivity() }
+            DisposableEffect(activity, showNowPlaying, nowPlayingKeepScreenOn) {
+                val window = activity?.window
+                val keepScreenOnFlag = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                val shouldKeepScreenOn = showNowPlaying && nowPlayingKeepScreenOn
+                val wasKeepScreenOn = window?.attributes?.flags?.and(keepScreenOnFlag) == keepScreenOnFlag
+                if (shouldKeepScreenOn) {
+                    window?.addFlags(keepScreenOnFlag)
+                }
+                onDispose {
+                    if (shouldKeepScreenOn && !wasKeepScreenOn) {
+                        window?.clearFlags(keepScreenOnFlag)
+                    }
+                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1612,6 +1630,10 @@ private fun NeriAppContent(
                                         showCoverSourceBadge = showCoverSourceBadge,
                                         onShowCoverSourceBadgeChange = { enabled ->
                                             scope.launch { repo.setShowCoverSourceBadge(enabled) }
+                                        },
+                                        nowPlayingKeepScreenOn = nowPlayingKeepScreenOn,
+                                        onNowPlayingKeepScreenOnChange = { enabled ->
+                                            scope.launch { repo.setNowPlayingKeepScreenOn(enabled) }
                                         },
                                         showNowPlayingTitle = showNowPlayingTitle,
                                         onShowNowPlayingTitleChange = { enabled ->
