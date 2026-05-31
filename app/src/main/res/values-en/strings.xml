@@ -1381,6 +1381,8 @@
     <string name="library_source_import_empty">No importable playlists loaded yet</string>
     <string name="library_source_import_apply">Save Selection (%1$d)</string>
     <string name="library_source_import_updated">Imported playlists updated</string>
+    <string name="library_platform_import_playlists">%1$s Imported Playlists</string>
+    <string name="library_platform_manage_source_empty_hint">Manage sources to choose the playlists shown here</string>
     <string name="library_platform_connect_platform">Connect %1$s</string>
     <string name="library_platform_empty_netease_playlist">Sign in to load your NetEase playlists</string>
     <string name="library_platform_empty_netease_album">Sign in to load your saved NetEase albums</string>

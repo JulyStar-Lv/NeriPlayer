@@ -1396,6 +1396,8 @@
     <string name="library_source_import_empty">暂未加载到可导入的歌单</string>
     <string name="library_source_import_apply">保存选择（%1$d）</string>
     <string name="library_source_import_updated">已更新导入歌单</string>
+    <string name="library_platform_import_playlists">%1$s 导入歌单</string>
+    <string name="library_platform_manage_source_empty_hint">前往管理音源，选择要显示在此处的歌单</string>
     <string name="library_platform_connect_platform">连接 %1$s</string>
     <string name="library_platform_empty_netease_playlist">登录后会从网易云拉取你的歌单</string>
     <string name="library_platform_empty_netease_album">登录后会从网易云拉取你收藏的专辑</string>

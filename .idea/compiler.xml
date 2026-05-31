@@ -2,6 +2,14 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel target="17">
+      <module name="NeriPlayer.buildSrc" target="21" />
+      <module name="NeriPlayer.buildSrc.main" target="21" />
+      <module name="NeriPlayer.buildSrc.test" target="21" />
+      <module name="TuneDock.buildSrc" target="21" />
+      <module name="TuneDock.buildSrc.main" target="21" />
+      <module name="TuneDock.buildSrc.test" target="21" />
+    </bytecodeTargetLevel>
+    <bytecodeTargetLevel target="17">
       <module name="NeriPlayer.composeApp" target="21" />
       <module name="NeriPlayer.composeApp.jvmMain" target="21" />
       <module name="NeriPlayer.composeApp.jvmTest" target="21" />
