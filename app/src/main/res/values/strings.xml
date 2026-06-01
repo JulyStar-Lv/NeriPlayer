@@ -54,6 +54,13 @@
     <string name="player_play_all">全部播放</string>
     <string name="player_play_selected">播放所选</string>
 
+    <!-- Home Screen Widgets -->
+    <string name="widget_player_large_name">音乐 · 大卡片</string>
+    <string name="widget_player_compact_name">音乐 · 小胶囊</string>
+    <string name="widget_player_cover_name">音乐 · 封面卡片</string>
+    <string name="widget_player_open_app">打开音理音理</string>
+    <string name="widget_player_cover_art">歌曲封面</string>
+
     <!-- Playlist -->
     <string name="playlist_title">歌单</string>
     <string name="playlist_current">当前歌单</string>

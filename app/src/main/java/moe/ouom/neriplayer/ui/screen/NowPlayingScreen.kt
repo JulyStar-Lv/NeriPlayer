@@ -277,6 +277,7 @@ private const val LyricsPageTransitionDurationMs = 300
 private const val CoverSourceBadgeRevealBufferMs = 120
 private const val CoverSourceBadgeRevealDelayMs =
     LyricsPageTransitionDurationMs + CoverSourceBadgeRevealBufferMs
+private const val NowPlayingPortraitContentWidthFraction = 0.97f
 private val LyricOffsetStepMsFloat = LYRIC_DEFAULT_OFFSET_STEP_MS.toFloat()
 
 internal fun shouldHideDownloadActionForSong(
@@ -751,6 +752,11 @@ fun NowPlayingScreen(
                 // 播放页面
                 val horizontalPadding = if (isLandscape) 16.dp else 20.dp
                 val verticalPadding = if (isLandscape) 8.dp else 12.dp
+                val primaryContentWidthFraction = if (useWideLandscapeLayout) {
+                    0.88f
+                } else {
+                    NowPlayingPortraitContentWidthFraction
+                }
                 var contentModifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.statusBars)
@@ -821,7 +827,10 @@ fun NowPlayingScreen(
                             )
                             isLandscape -> minOf(windowWidthDp * 0.45f, maxHeight * 0.5f, maxWidth)
                             else -> {
-                                minOf(maxWidth * 0.97f, maxHeight * 0.78f)
+                                minOf(
+                                    maxWidth * NowPlayingPortraitContentWidthFraction,
+                                    maxHeight * 0.78f
+                                )
                             }
                         }
                         val coverSize by animateDpAsState(
@@ -963,7 +972,7 @@ fun NowPlayingScreen(
                         visible = contentVisible,
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
-                            .fillMaxWidth(if (useWideLandscapeLayout) 0.88f else 1f),
+                            .fillMaxWidth(primaryContentWidthFraction),
                         enter = slideInVertically(
                             animationSpec = tween(durationMillis = 400, delayMillis = 150),
                             initialOffsetY = { it / 4 }
@@ -1146,7 +1155,7 @@ fun NowPlayingScreen(
                         useWideLandscapeLayout = useWideLandscapeLayout,
                         onPreviewPositionChange = { previewPositionOverrideMs = it },
                         modifier = Modifier
-                            .fillMaxWidth(if (useWideLandscapeLayout) 0.88f else 1f)
+                            .fillMaxWidth(primaryContentWidthFraction)
                             .sharedBounds(
                                 rememberSharedContentState(key = "progress_bar"),
                                 animatedVisibilityScope = this@AnimatedContent

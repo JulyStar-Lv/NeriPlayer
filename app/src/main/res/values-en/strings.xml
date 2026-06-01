@@ -54,6 +54,13 @@
     <string name="player_play_all">Play All</string>
     <string name="player_play_selected">Play Selected</string>
 
+    <!-- Home Screen Widgets -->
+    <string name="widget_player_large_name">Music · Large Card</string>
+    <string name="widget_player_compact_name">Music · Compact Pill</string>
+    <string name="widget_player_cover_name">Music · Cover Card</string>
+    <string name="widget_player_open_app">Open NeriPlayer</string>
+    <string name="widget_player_cover_art">Cover art</string>
+
     <!-- Playlist -->
     <string name="playlist_title">Playlist</string>
     <string name="playlist_current">Current Playlist</string>

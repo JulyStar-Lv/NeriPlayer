@@ -73,6 +73,39 @@
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             />
+        <receiver
+            android:name=".widget.PlayerLargeWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_player_large_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/player_widget_large" />
+        </receiver>
+        <receiver
+            android:name=".widget.PlayerCompactWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_player_compact_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/player_widget_compact" />
+        </receiver>
+        <receiver
+            android:name=".widget.PlayerCoverWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_player_cover_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/player_widget_cover" />
+        </receiver>
         <service
             android:name="moe.ouom.neriplayer.core.player.AudioPlayerService"
             android:exported="false"
