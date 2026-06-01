@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,11 +74,13 @@ import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -98,6 +101,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,7 +114,10 @@ import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.data.auth.common.SavedCookieAuthState
 import moe.ouom.neriplayer.data.auth.youtube.YouTubeAuthState
+import moe.ouom.neriplayer.data.playlist.favorite.FavoritePlaylist
 import moe.ouom.neriplayer.data.playlist.favorite.FavoritePlaylistRepository
+import moe.ouom.neriplayer.data.playlist.source.SourceLibraryItem
+import moe.ouom.neriplayer.data.playlist.source.SourceLibraryRepository
 import moe.ouom.neriplayer.data.local.playlist.system.FavoritesPlaylist
 import moe.ouom.neriplayer.data.local.playlist.system.LocalFilesPlaylist
 import moe.ouom.neriplayer.data.local.playlist.model.LocalPlaylist
@@ -118,6 +125,7 @@ import moe.ouom.neriplayer.data.local.playlist.LocalPlaylistRepository
 import moe.ouom.neriplayer.data.local.playlist.system.SystemLocalPlaylists
 import moe.ouom.neriplayer.data.model.displayCoverUrl
 import moe.ouom.neriplayer.ui.LocalMiniPlayerHeight
+import moe.ouom.neriplayer.ui.component.bottomSheetScrollGuard
 import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsBiliAuthDialogs
 import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsNeteaseAuthDialogs
 import moe.ouom.neriplayer.ui.screen.tab.settings.auth.SettingsYouTubeAuthDialogs
@@ -129,7 +137,9 @@ import moe.ouom.neriplayer.ui.viewmodel.auth.YouTubeAuthViewModel
 import moe.ouom.neriplayer.ui.viewmodel.debug.NeteaseAuthEvent
 import moe.ouom.neriplayer.ui.viewmodel.debug.NeteaseAuthViewModel
 import moe.ouom.neriplayer.ui.viewmodel.tab.AlbumSummary
+import moe.ouom.neriplayer.ui.viewmodel.tab.BILI_SINGLE_VIDEO_FID
 import moe.ouom.neriplayer.ui.viewmodel.tab.BiliPlaylist
+import moe.ouom.neriplayer.ui.viewmodel.tab.LibraryUiState
 import moe.ouom.neriplayer.ui.viewmodel.tab.LibraryViewModel
 import moe.ouom.neriplayer.ui.viewmodel.tab.PlaylistSummary
 import moe.ouom.neriplayer.ui.viewmodel.tab.YouTubeMusicPlaylist
@@ -178,23 +188,42 @@ private data class PlatformAuthUiState(
     val actionLabel: String
 )
 
-private fun libraryTabDisplayOrder(isInternational: Boolean): List<LibraryTab> {
-    return if (isInternational) {
-        listOf(
-            LibraryTab.LOCAL,
-            LibraryTab.FAVORITE,
-            LibraryTab.YTMUSIC,
-            LibraryTab.NETEASE,
-            LibraryTab.BILI
-        )
-    } else {
-        listOf(
-            LibraryTab.LOCAL,
-            LibraryTab.FAVORITE,
-            LibraryTab.NETEASE,
-            LibraryTab.YTMUSIC,
-            LibraryTab.BILI
-        )
+private data class SourcePlaylistImportItem(
+    val key: String,
+    val id: Long,
+    val title: String,
+    val coverUrl: String?,
+    val trackCount: Int,
+    val source: String,
+    val browseId: String? = null,
+    val playlistId: String? = null,
+    val subtitle: String? = null,
+    val fid: Long? = null,
+    val mid: Long? = null,
+    val bvid: String? = null
+)
+
+private val LibraryAuthPlatform.sourceLibrarySource: String?
+    get() = when (this) {
+        LibraryAuthPlatform.NETEASE -> "netease"
+        LibraryAuthPlatform.YOUTUBE -> "youtubeMusic"
+        LibraryAuthPlatform.BILI -> "bili"
+        LibraryAuthPlatform.QQMUSIC -> null
+    }
+
+private fun sourceImportKey(source: String, id: Long): String = "$source:$id"
+
+private fun libraryTabDisplayOrder(
+    showNetease: Boolean,
+    showBili: Boolean,
+    showYouTubeMusic: Boolean
+): List<LibraryTab> {
+    return buildList {
+        add(LibraryTab.LOCAL)
+        add(LibraryTab.FAVORITE)
+        if (showNetease) add(LibraryTab.NETEASE)
+        if (showBili) add(LibraryTab.BILI)
+        if (showYouTubeMusic) add(LibraryTab.YTMUSIC)
     }
 }
 
@@ -226,21 +255,12 @@ fun LibraryScreen(
     val biliAuthUiState by biliVm.uiState.collectAsState()
     val youtubeAuthUiState by youtubeVm.uiState.collectAsState()
     val context = LocalContext.current
+    val sourceLibraryRepo = remember(context) { SourceLibraryRepository.getInstance(context) }
+    val sourceLibraryItems by sourceLibraryRepo.items.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val defaultPlaylistName = stringResource(R.string.library_create_playlist_default)
-    val isInternational by AppContainer.settingsRepo.internationalizationEnabledFlow
-        .collectAsState(initial = false)
-    val orderedTabs = remember(isInternational) { libraryTabDisplayOrder(isInternational) }
-    val initialPage = remember(orderedTabs, initialTab) {
-        orderedTabs.indexOf(initialTab).takeIf { it >= 0 } ?: 0
-    }
-
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { orderedTabs.size }
-    )
     val scope = rememberCoroutineScope()
-    var showPlatformAccountPage by rememberSaveable { mutableStateOf(false) }
+    var showPlatformAccountSheet by rememberSaveable { mutableStateOf(false) }
     var inlineMsg by remember { mutableStateOf<String?>(null) }
     var showNeteaseSheet by remember { mutableStateOf(false) }
     var showNeteaseSavedCookieDialog by remember { mutableStateOf(false) }
@@ -259,6 +279,67 @@ fun LibraryScreen(
     var showYouTubeCookieDialog by remember { mutableStateOf(false) }
     var youtubeSheetInitialTab by rememberSaveable { mutableStateOf(0) }
     var youtubeCookieText by remember { mutableStateOf("") }
+    var manageSourcePlatform by remember { mutableStateOf<LibraryAuthPlatform?>(null) }
+    var selectedBiliFolder by rememberSaveable { mutableStateOf<BiliPlaylist?>(null) }
+
+    val neteasePlaylistAuth = savedCookiePlatformAuthUiState(
+        platform = LibraryAuthPlatform.NETEASE,
+        title = stringResource(R.string.platform_netease),
+        iconResId = R.drawable.ic_netease_cloud_music,
+        healthState = neteaseAuthUiState.health.state,
+        savedAt = neteaseAuthUiState.health.savedAt,
+        hasSavedCookies = neteaseAuthUiState.hasSavedCookies,
+        validStatusResId = R.string.settings_netease_status_valid,
+        savedInvalidResId = R.string.settings_netease_status_saved_invalid,
+        missingResId = R.string.settings_netease_status_missing,
+        emptyHint = stringResource(R.string.library_platform_empty_netease_playlist)
+    )
+    val biliAuth = savedCookiePlatformAuthUiState(
+        platform = LibraryAuthPlatform.BILI,
+        title = stringResource(R.string.platform_bilibili),
+        iconResId = R.drawable.ic_bilibili,
+        healthState = biliAuthUiState.health.state,
+        savedAt = biliAuthUiState.health.savedAt,
+        hasSavedCookies = biliAuthUiState.hasSavedCookies,
+        validStatusResId = R.string.settings_bili_status_valid,
+        savedInvalidResId = R.string.settings_bili_status_saved_invalid,
+        missingResId = R.string.settings_bili_status_missing,
+        emptyHint = stringResource(R.string.library_platform_empty_bilibili)
+    )
+    val youtubeAuth = youtubePlatformAuthUiState(
+        title = stringResource(R.string.common_youtube),
+        healthState = youtubeAuthUiState.health.state,
+        savedAt = youtubeAuthUiState.health.savedAt,
+        hasSavedAuth = youtubeAuthUiState.hasSavedAuth
+    )
+    val orderedTabs = remember(
+        neteasePlaylistAuth.connectionState,
+        biliAuth.connectionState,
+        youtubeAuth.connectionState
+    ) {
+        libraryTabDisplayOrder(
+            showNetease = neteasePlaylistAuth.connectionState == PlatformConnectionState.Connected,
+            showBili = biliAuth.connectionState == PlatformConnectionState.Connected,
+            showYouTubeMusic = youtubeAuth.connectionState == PlatformConnectionState.Connected
+        )
+    }
+    val initialPage = remember(orderedTabs, initialTab) {
+        orderedTabs.indexOf(initialTab).takeIf { it >= 0 } ?: 0
+    }
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { orderedTabs.size }
+    )
+    val platformAuthStates = listOf(neteasePlaylistAuth, biliAuth, youtubeAuth)
+    val displayedNeteasePlaylists = remember(sourceLibraryItems, ui.neteasePlaylists) {
+        selectedNeteasePlaylists(sourceLibraryItems, ui.neteasePlaylists)
+    }
+    val displayedYouTubeMusicPlaylists = remember(sourceLibraryItems, ui.youtubeMusicPlaylists) {
+        selectedYouTubeMusicPlaylists(sourceLibraryItems, ui.youtubeMusicPlaylists)
+    }
+    val displayedBiliPlaylists = remember(sourceLibraryItems) {
+        selectedBiliPlaylists(sourceLibraryItems)
+    }
 
     fun openNeteaseAuth(tab: Int = 0) {
         inlineMsg = null
@@ -294,8 +375,23 @@ fun LibraryScreen(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
+    fun openSourceImport(platform: LibraryAuthPlatform) {
+        inlineMsg = null
+        when (platform) {
+            LibraryAuthPlatform.NETEASE -> {
+                vm.refreshNeteasePlaylists()
+                vm.refreshNeteaseAlbums()
+            }
+            LibraryAuthPlatform.YOUTUBE -> vm.refreshYouTubeMusicPlaylists()
+            LibraryAuthPlatform.BILI -> vm.refreshBilibili()
+            LibraryAuthPlatform.QQMUSIC -> Unit
+        }
+        manageSourcePlatform = platform
+    }
+
     LaunchedEffect(initialTab, orderedTabs) {
-        val targetPage = orderedTabs.indexOf(initialTab).takeIf { it >= 0 } ?: 0
+        val targetPage = orderedTabs.indexOf(initialTab).takeIf { it >= 0 }
+            ?: pagerState.currentPage.coerceIn(0, orderedTabs.lastIndex)
         if (pagerState.currentPage != targetPage) {
             pagerState.scrollToPage(targetPage)
         }
@@ -303,6 +399,9 @@ fun LibraryScreen(
 
     LaunchedEffect(pagerState.currentPage, orderedTabs, initialTab) {
         val currentTab = orderedTabs.getOrNull(pagerState.currentPage) ?: return@LaunchedEffect
+        if (currentTab != LibraryTab.BILI) {
+            selectedBiliFolder = null
+        }
         if (currentTab != initialTab) {
             onTabChange(currentTab)
         }
@@ -316,6 +415,12 @@ fun LibraryScreen(
         neteaseVm.refreshAuthHealth()
         biliVm.refreshAuthHealth()
         youtubeVm.refreshAuthHealth()
+    }
+
+    LaunchedEffect(selectedBiliFolder?.mediaId) {
+        selectedBiliFolder?.let { folder ->
+            vm.refreshBiliFolderCollections(folder)
+        }
     }
 
     LaunchedEffect(neteaseVm) {
@@ -394,37 +499,6 @@ fun LibraryScreen(
         }
     }
 
-    val neteasePlaylistAuth = savedCookiePlatformAuthUiState(
-        platform = LibraryAuthPlatform.NETEASE,
-        title = stringResource(R.string.platform_netease),
-        iconResId = R.drawable.ic_netease_cloud_music,
-        healthState = neteaseAuthUiState.health.state,
-        savedAt = neteaseAuthUiState.health.savedAt,
-        hasSavedCookies = neteaseAuthUiState.hasSavedCookies,
-        validStatusResId = R.string.settings_netease_status_valid,
-        savedInvalidResId = R.string.settings_netease_status_saved_invalid,
-        missingResId = R.string.settings_netease_status_missing,
-        emptyHint = stringResource(R.string.library_platform_empty_netease_playlist)
-    )
-    val biliAuth = savedCookiePlatformAuthUiState(
-        platform = LibraryAuthPlatform.BILI,
-        title = stringResource(R.string.platform_bilibili),
-        iconResId = R.drawable.ic_bilibili,
-        healthState = biliAuthUiState.health.state,
-        savedAt = biliAuthUiState.health.savedAt,
-        hasSavedCookies = biliAuthUiState.hasSavedCookies,
-        validStatusResId = R.string.settings_bili_status_valid,
-        savedInvalidResId = R.string.settings_bili_status_saved_invalid,
-        missingResId = R.string.settings_bili_status_missing,
-        emptyHint = stringResource(R.string.library_platform_empty_bilibili)
-    )
-    val youtubeAuth = youtubePlatformAuthUiState(
-        title = stringResource(R.string.common_youtube),
-        healthState = youtubeAuthUiState.health.state,
-        savedAt = youtubeAuthUiState.health.savedAt,
-        hasSavedAuth = youtubeAuthUiState.hasSavedAuth
-    )
-    val platformAuthStates = listOf(neteasePlaylistAuth, youtubeAuth, biliAuth)
     val hasConnectedPlatform = platformAuthStates.any {
         it.connectionState == PlatformConnectionState.Connected
     }
@@ -438,6 +512,7 @@ fun LibraryScreen(
     }
 
     fun handlePlatformAuthAction(platform: LibraryAuthPlatform) {
+        showPlatformAccountSheet = false
         when (platform) {
             LibraryAuthPlatform.NETEASE -> openNeteaseAuth()
             LibraryAuthPlatform.YOUTUBE -> openYouTubeAuth()
@@ -446,152 +521,206 @@ fun LibraryScreen(
         }
     }
 
-    BackHandler(enabled = showPlatformAccountPage) {
-        showPlatformAccountPage = false
+    BackHandler(enabled = showPlatformAccountSheet) {
+        showPlatformAccountSheet = false
     }
 
-    if (showPlatformAccountPage) {
-        PlatformAccountPage(
+    BackHandler(enabled = selectedBiliFolder != null && !showPlatformAccountSheet) {
+        selectedBiliFolder = null
+    }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
+    ) {
+        LargeTopAppBar(
+            title = { Text(stringResource(R.string.library_title)) },
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            ),
+            actions = {
+                HapticIconButton(onClick = onOpenStats) {
+                    Icon(
+                        Icons.Filled.BarChart,
+                        contentDescription = stringResource(R.string.stats_title)
+                    )
+                }
+                HapticIconButton(onClick = onOpenRecent) {
+                    Icon(
+                        Icons.Outlined.History,
+                        contentDescription = stringResource(R.string.recent_title)
+                    )
+                }
+                HapticIconButton(onClick = { showPlatformAccountSheet = true }) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.library_platform_accounts),
+                        tint = accountIconTint
+                    )
+                }
+            }
+        )
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            modifier = Modifier
+                .padding(horizontal = 0.dp, vertical = 12.dp)
+                .fillMaxSize()
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                val selectedTabIndex = pagerState.currentPage.coerceIn(0, orderedTabs.lastIndex)
+                PrimaryScrollableTabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    edgePadding = 8.dp,
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ) {
+                    orderedTabs.forEachIndexed { index, tab ->
+                        Tab(
+                            selected = selectedTabIndex == index,
+                            onClick = {
+                                scope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            },
+                            selectedContentColor = MaterialTheme.colorScheme.primary,
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = { Text(stringResource(tab.labelResId)) }
+                        )
+                    }
+                }
+
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    pageSpacing = 0.dp
+                ) { page ->
+                    when (orderedTabs[page]) {
+                        LibraryTab.LOCAL -> LocalPlaylistList(
+                            playlists = ui.localPlaylists,
+                            listState = localListState,
+                            onCreate = { name ->
+                                val finalName = name.trim().ifBlank { defaultPlaylistName }
+                                vm.createLocalPlaylist(finalName)
+                            },
+                            onClick = onLocalPlaylistClick,
+                            onRename = { playlistId, newName ->
+                                vm.renameLocalPlaylist(playlistId, newName)
+                            },
+                            onDelete = { playlistId ->
+                                vm.deleteLocalPlaylist(playlistId)
+                            },
+                            onReorder = { order ->
+                                vm.reorderLocalPlaylists(order)
+                            }
+                        )
+
+                        LibraryTab.FAVORITE -> FavoritePlaylistList(
+                            listState = favoriteListState,
+                            onNeteasePlaylistClick = onNeteasePlaylistClick,
+                            onNeteaseAlbumClick = onNeteaseAlbumClick,
+                            onBiliPlaylistClick = onBiliPlaylistClick,
+                            onYouTubeMusicPlaylistClick = onYouTubeMusicPlaylistClick
+                        )
+
+                        LibraryTab.NETEASE,
+                        LibraryTab.NETEASEALBUM -> NeteaseLibraryList(
+                            playlists = displayedNeteasePlaylists,
+                            albums = emptyList(),
+                            listState = neteaseListState,
+                            authUiState = neteasePlaylistAuth,
+                            onPlaylistClick = onNeteasePlaylistClick,
+                            onAlbumClick = onNeteaseAlbumClick,
+                            onAuthAction = { openNeteaseAuth() },
+                            onManageSource = { openSourceImport(LibraryAuthPlatform.NETEASE) }
+                        )
+
+                        LibraryTab.YTMUSIC -> YouTubeMusicPlaylistList(
+                            playlists = displayedYouTubeMusicPlaylists,
+                            error = ui.youtubeMusicError,
+                            listState = youtubeMusicListState,
+                            authUiState = youtubeAuth,
+                            onClick = onYouTubeMusicPlaylistClick,
+                            onAuthAction = { openYouTubeAuth() },
+                            onManageSource = { openSourceImport(LibraryAuthPlatform.YOUTUBE) },
+                            onRetry = { vm.refreshYouTubeMusicPlaylists() }
+                        )
+
+                        LibraryTab.BILI -> {
+                            val folder = selectedBiliFolder
+                            if (folder == null) {
+                                BiliPlaylistList(
+                                    playlists = displayedBiliPlaylists,
+                                    listState = biliListState,
+                                    authUiState = biliAuth,
+                                    onClick = { playlist ->
+                                        if (playlist.fid == BILI_SINGLE_VIDEO_FID) {
+                                            onBiliPlaylistClick(playlist)
+                                        } else {
+                                            selectedBiliFolder = playlist
+                                        }
+                                    },
+                                    onAuthAction = { openBiliAuth() },
+                                    onManageSource = { openSourceImport(LibraryAuthPlatform.BILI) }
+                                )
+                            } else {
+                                BiliFolderCollectionList(
+                                    folder = folder,
+                                    collections = ui.biliFolderCollections[folder.mediaId].orEmpty(),
+                                    loading = ui.biliFolderCollectionLoading.contains(folder.mediaId),
+                                    error = ui.biliFolderCollectionErrors[folder.mediaId],
+                                    listState = biliListState,
+                                    onClick = onBiliPlaylistClick,
+                                    onNavigateUp = { selectedBiliFolder = null },
+                                    onRetry = { vm.refreshBiliFolderCollections(folder) }
+                                )
+                            }
+                        }
+
+                        LibraryTab.QQMUSIC -> QqMusicPlaylistList(
+                            listState = qqMusicListState
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showPlatformAccountSheet) {
+        PlatformAccountSheet(
             platforms = platformAuthStates,
-            onNavigateUp = { showPlatformAccountPage = false },
+            onDismiss = { showPlatformAccountSheet = false },
             onPlatformAction = ::handlePlatformAuthAction
         )
-    } else {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
-        ) {
-            LargeTopAppBar(
-                title = { Text(stringResource(R.string.library_title)) },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
-                ),
-                actions = {
-                    HapticIconButton(onClick = onOpenStats) {
-                        Icon(
-                            Icons.Filled.BarChart,
-                            contentDescription = stringResource(R.string.stats_title)
-                        )
-                    }
-                    HapticIconButton(onClick = onOpenRecent) {
-                        Icon(
-                            Icons.Outlined.History,
-                            contentDescription = stringResource(R.string.recent_title)
-                        )
-                    }
-                    HapticIconButton(onClick = { showPlatformAccountPage = true }) {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.library_platform_accounts),
-                            tint = accountIconTint
-                        )
-                    }
-                }
-            )
+    }
 
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                modifier = Modifier
-                    .padding(horizontal = 0.dp, vertical = 12.dp)
-                    .fillMaxSize()
-            ) {
-                Column(Modifier.fillMaxSize()) {
-                    PrimaryScrollableTabRow(
-                        selectedTabIndex = pagerState.currentPage,
-                        edgePadding = 8.dp,
-                        containerColor = Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        orderedTabs.forEachIndexed { index, tab ->
-                            Tab(
-                                selected = pagerState.currentPage == index,
-                                onClick = {
-                                    scope.launch {
-                                        pagerState.animateScrollToPage(index)
-                                    }
-                                },
-                                selectedContentColor = MaterialTheme.colorScheme.primary,
-                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                text = { Text(stringResource(tab.labelResId)) }
-                            )
-                        }
-                    }
-
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxSize(),
-                        pageSpacing = 0.dp
-                    ) { page ->
-                        when (orderedTabs[page]) {
-                            LibraryTab.LOCAL -> LocalPlaylistList(
-                                playlists = ui.localPlaylists,
-                                listState = localListState,
-                                onCreate = { name ->
-                                    val finalName = name.trim().ifBlank { defaultPlaylistName }
-                                    vm.createLocalPlaylist(finalName)
-                                },
-                                onClick = onLocalPlaylistClick,
-                                onRename = { playlistId, newName ->
-                                    vm.renameLocalPlaylist(playlistId, newName)
-                                },
-                                onDelete = { playlistId ->
-                                    vm.deleteLocalPlaylist(playlistId)
-                                },
-                                onReorder = { order ->
-                                    vm.reorderLocalPlaylists(order)
-                                }
-                            )
-
-                            LibraryTab.FAVORITE -> FavoritePlaylistList(
-                                listState = favoriteListState,
-                                onNeteasePlaylistClick = onNeteasePlaylistClick,
-                                onNeteaseAlbumClick = onNeteaseAlbumClick,
-                                onBiliPlaylistClick = onBiliPlaylistClick,
-                                onYouTubeMusicPlaylistClick = onYouTubeMusicPlaylistClick
-                            )
-
-                            LibraryTab.NETEASE,
-                            LibraryTab.NETEASEALBUM -> NeteaseLibraryList(
-                                playlists = ui.neteasePlaylists,
-                                albums = ui.neteaseAlbums,
-                                listState = neteaseListState,
-                                authUiState = neteasePlaylistAuth,
-                                onPlaylistClick = onNeteasePlaylistClick,
-                                onAlbumClick = onNeteaseAlbumClick,
-                                onAuthAction = { openNeteaseAuth() }
-                            )
-
-                            LibraryTab.YTMUSIC -> YouTubeMusicPlaylistList(
-                                playlists = ui.youtubeMusicPlaylists,
-                                error = ui.youtubeMusicError,
-                                listState = youtubeMusicListState,
-                                authUiState = youtubeAuth,
-                                onClick = onYouTubeMusicPlaylistClick,
-                                onAuthAction = { openYouTubeAuth() },
-                                onRetry = { vm.refreshYouTubeMusicPlaylists() }
-                            )
-
-                            LibraryTab.BILI -> BiliPlaylistList(
-                                playlists = ui.biliPlaylists,
-                                listState = biliListState,
-                                authUiState = biliAuth,
-                                onClick = onBiliPlaylistClick,
-                                onAuthAction = { openBiliAuth() }
-                            )
-
-                            LibraryTab.QQMUSIC -> QqMusicPlaylistList(
-                                listState = qqMusicListState
-                            )
-                        }
-                    }
-                }
+    manageSourcePlatform?.let { platform ->
+        platformAuthStates.firstOrNull { it.platform == platform }?.let { authUiState ->
+            if (platform == LibraryAuthPlatform.BILI) {
+                BiliSourcePlaylistImportSheet(
+                    authUiState = authUiState,
+                    folders = ui.biliPlaylists,
+                    ui = ui,
+                    sourceItems = sourceLibraryItems,
+                    sourceLibraryRepo = sourceLibraryRepo,
+                    onLoadFolder = vm::refreshBiliFolderCollections,
+                    onDismiss = { manageSourcePlatform = null }
+                )
+            } else {
+                SourcePlaylistImportSheet(
+                    authUiState = authUiState,
+                    importItems = sourcePlaylistImportItems(platform, ui),
+                    sourceItems = sourceLibraryItems,
+                    sourceLibraryRepo = sourceLibraryRepo,
+                    onDismiss = { manageSourcePlatform = null }
+                )
             }
         }
     }
@@ -619,7 +748,8 @@ fun LibraryScreen(
         onLogout = {
             showNeteaseSavedCookieDialog = false
             neteaseVm.clearCookies()
-        }
+        },
+        onManageSource = { openSourceImport(LibraryAuthPlatform.NETEASE) }
     )
 
     SettingsBiliAuthDialogs(
@@ -642,7 +772,8 @@ fun LibraryScreen(
         onLogout = {
             showBiliSavedCookieDialog = false
             biliVm.clearCookies()
-        }
+        },
+        onManageSource = { openSourceImport(LibraryAuthPlatform.BILI) }
     )
 
     SettingsYouTubeAuthDialogs(
@@ -665,7 +796,8 @@ fun LibraryScreen(
         onLogout = {
             showYouTubeSavedCookieDialog = false
             youtubeVm.clearAuth()
-        }
+        },
+        onManageSource = { openSourceImport(LibraryAuthPlatform.YOUTUBE) }
     )
 }
 
@@ -757,62 +889,51 @@ private fun platformActionLabel(connectionState: PlatformConnectionState): Strin
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun PlatformAccountPage(
+private fun PlatformAccountSheet(
     platforms: List<PlatformAuthUiState>,
-    onNavigateUp: () -> Unit,
+    onDismiss: () -> Unit,
     onPlatformAction: (LibraryAuthPlatform) -> Unit
 ) {
-    val miniPlayerHeight = LocalMiniPlayerHeight.current
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
-        LargeTopAppBar(
-            title = { Text(stringResource(R.string.library_platform_accounts)) },
-            navigationIcon = {
-                HapticIconButton(onClick = onNavigateUp) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = stringResource(R.string.action_back)
+        Column(
+            modifier = Modifier
+                .bottomSheetScrollGuard()
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.library_platform_accounts),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+            )
+
+            Text(
+                text = stringResource(R.string.library_platform_accounts_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 12.dp)
+            )
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(
+                    items = platforms,
+                    key = { platform -> platform.platform.name }
+                ) { platform ->
+                    PlatformAccountRow(
+                        authUiState = platform,
+                        onAction = { onPlatformAction(platform.platform) }
                     )
                 }
-            },
-            scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = Color.Transparent
-            )
-        )
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 4.dp,
-                bottom = 24.dp + miniPlayerHeight
-            )
-        ) {
-            item {
-                Text(
-                    text = stringResource(R.string.library_platform_accounts_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 12.dp)
-                )
-            }
-
-            items(
-                items = platforms,
-                key = { platform -> platform.platform.name }
-            ) { platform ->
-                PlatformAccountRow(
-                    authUiState = platform,
-                    onAction = { onPlatformAction(platform.platform) }
-                )
             }
         }
     }
@@ -860,6 +981,676 @@ private fun PlatformAccountRow(
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
+}
+
+private fun sourcePlaylistImportItems(
+    platform: LibraryAuthPlatform,
+    ui: LibraryUiState
+): List<SourcePlaylistImportItem> {
+    return when (platform) {
+        LibraryAuthPlatform.NETEASE -> ui.neteasePlaylists.map { playlist ->
+            SourcePlaylistImportItem(
+                key = sourceImportKey("netease", playlist.id),
+                id = playlist.id,
+                title = playlist.name,
+                coverUrl = playlist.picUrl,
+                trackCount = playlist.trackCount,
+                source = "netease"
+            )
+        }
+        LibraryAuthPlatform.YOUTUBE -> ui.youtubeMusicPlaylists.map { playlist ->
+            val favoriteId = playlist.favoriteId()
+            SourcePlaylistImportItem(
+                key = sourceImportKey("youtubeMusic", favoriteId),
+                id = favoriteId,
+                title = playlist.title,
+                coverUrl = playlist.coverUrl,
+                trackCount = playlist.trackCount,
+                source = "youtubeMusic",
+                browseId = playlist.browseId,
+                playlistId = playlist.playlistId,
+                subtitle = playlist.subtitle
+            )
+        }
+        LibraryAuthPlatform.BILI -> ui.biliPlaylists.map { playlist ->
+            SourcePlaylistImportItem(
+                key = sourceImportKey("bili", playlist.mediaId),
+                id = playlist.mediaId,
+                title = playlist.title,
+                coverUrl = playlist.coverUrl,
+                trackCount = playlist.count,
+                source = "bili",
+                fid = playlist.fid,
+                mid = playlist.mid,
+                bvid = playlist.bvid
+            )
+        }
+        LibraryAuthPlatform.QQMUSIC -> emptyList()
+    }
+}
+
+private fun selectedNeteasePlaylists(
+    sourceItems: List<SourceLibraryItem>,
+    livePlaylists: List<PlaylistSummary>
+): List<PlaylistSummary> {
+    val liveById = livePlaylists.associateBy { it.id }
+    return sourceItems
+        .filter { it.source == "netease" }
+        .map { item ->
+            liveById[item.id] ?: PlaylistSummary(
+                id = item.id,
+                name = item.name,
+                picUrl = item.coverUrl.orEmpty(),
+                playCount = 0,
+                trackCount = item.trackCount
+            )
+        }
+}
+
+private fun selectedYouTubeMusicPlaylists(
+    sourceItems: List<SourceLibraryItem>,
+    livePlaylists: List<YouTubeMusicPlaylist>
+): List<YouTubeMusicPlaylist> {
+    val liveById = livePlaylists.associateBy { it.favoriteId() }
+    return sourceItems
+        .filter { it.source == "youtubeMusic" }
+        .mapNotNull { item ->
+            liveById[item.id] ?: run {
+                val browseId = item.browseId
+                    ?.takeIf { it.isNotBlank() }
+                    ?: item.playlistId
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { "VL$it" }
+                val playlistId = item.playlistId
+                    ?.takeIf { it.isNotBlank() }
+                    ?: browseId?.removePrefix("VL")
+                if (browseId.isNullOrBlank() || playlistId.isNullOrBlank()) {
+                    null
+                } else {
+                    YouTubeMusicPlaylist(
+                        browseId = browseId,
+                        playlistId = playlistId,
+                        title = item.name,
+                        subtitle = item.subtitle.orEmpty(),
+                        coverUrl = item.coverUrl.orEmpty(),
+                        trackCount = item.trackCount
+                    )
+                }
+            }
+        }
+}
+
+private fun selectedBiliPlaylists(sourceItems: List<SourceLibraryItem>): List<BiliPlaylist> {
+    return sourceItems
+        .filter { it.source == "bili" }
+        .map { item ->
+            BiliPlaylist(
+                mediaId = item.id,
+                fid = item.fid ?: if (!item.bvid.isNullOrBlank()) BILI_SINGLE_VIDEO_FID else 0L,
+                mid = item.mid ?: 0L,
+                title = item.name,
+                count = item.trackCount,
+                coverUrl = item.coverUrl.orEmpty(),
+                bvid = item.bvid.orEmpty()
+            )
+        }
+}
+
+private fun SourcePlaylistImportItem.toSourceLibraryItem(): SourceLibraryItem {
+    return SourceLibraryItem(
+        id = id,
+        name = title,
+        coverUrl = coverUrl,
+        trackCount = trackCount,
+        source = source,
+        browseId = browseId,
+        playlistId = playlistId,
+        subtitle = subtitle,
+        fid = fid,
+        mid = mid,
+        bvid = bvid
+    )
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SourcePlaylistImportSheet(
+    authUiState: PlatformAuthUiState,
+    importItems: List<SourcePlaylistImportItem>,
+    sourceItems: List<SourceLibraryItem>,
+    sourceLibraryRepo: SourceLibraryRepository,
+    onDismiss: () -> Unit
+) {
+    val source = authUiState.platform.sourceLibrarySource ?: return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val itemKeys = remember(importItems) { importItems.map { it.key }.toSet() }
+    val importedKeys = remember(sourceItems, source, itemKeys) {
+        sourceItems
+            .filter { it.source == source }
+            .map { sourceImportKey(it.source, it.id) }
+            .filter { it in itemKeys }
+            .toSet()
+    }
+    var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val allSelected = importItems.isNotEmpty() && selectedKeys.size == importItems.size
+
+    LaunchedEffect(authUiState.platform, itemKeys, importedKeys) {
+        selectedKeys = importedKeys
+    }
+
+    fun toggleItem(key: String) {
+        selectedKeys = if (key in selectedKeys) selectedKeys - key else selectedKeys + key
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        sheetGesturesEnabled = false,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .bottomSheetScrollGuard()
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = authUiState.iconResId),
+                    contentDescription = authUiState.title,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.library_source_import_title, authUiState.title),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (importItems.isEmpty()) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.library_source_import_empty)) },
+                    supportingContent = {
+                        Text(
+                            text = authUiState.statusText,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(
+                        items = importItems,
+                        key = { it.key }
+                    ) { item ->
+                        val selected = item.key in selectedKeys
+                        ListItem(
+                            leadingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = selected,
+                                        onCheckedChange = { toggleItem(item.key) }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    if (!item.coverUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = offlineCachedImageRequest(
+                                                context = context,
+                                                data = item.coverUrl,
+                                                sizePx = 160,
+                                                allowHardware = false
+                                            ),
+                                            contentDescription = item.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                            contentDescription = item.title,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            headlineContent = {
+                                Text(
+                                    text = item.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = pluralStringResource(
+                                        R.plurals.library_song_count,
+                                        item.trackCount,
+                                        item.trackCount
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable { toggleItem(item.key) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HapticTextButton(
+                    enabled = importItems.isNotEmpty(),
+                    onClick = {
+                        selectedKeys = if (allSelected) {
+                            emptySet()
+                        } else {
+                            itemKeys
+                        }
+                    }
+                ) {
+                    Text(
+                        if (allSelected) {
+                            stringResource(R.string.action_deselect_all)
+                        } else {
+                            stringResource(R.string.action_select_all)
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                HapticTextButton(
+                    enabled = importItems.isNotEmpty(),
+                    onClick = {
+                        val selectedItems = importItems.filter { it.key in selectedKeys }
+                        scope.launch {
+                            sourceLibraryRepo.replaceSourceItems(
+                                source = source,
+                                selectedItems = selectedItems.map { it.toSourceLibraryItem() }
+                            )
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.library_source_import_updated),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onDismiss()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.library_source_import_apply, selectedKeys.size))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun BiliSourcePlaylistImportSheet(
+    authUiState: PlatformAuthUiState,
+    folders: List<BiliPlaylist>,
+    ui: LibraryUiState,
+    sourceItems: List<SourceLibraryItem>,
+    sourceLibraryRepo: SourceLibraryRepository,
+    onLoadFolder: (BiliPlaylist) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val source = "bili"
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedFolder by remember { mutableStateOf<BiliPlaylist?>(null) }
+    val folder = selectedFolder
+    val collections = folder?.let { ui.biliFolderCollections[it.mediaId] }.orEmpty()
+    val loading = folder?.let { ui.biliFolderCollectionLoading.contains(it.mediaId) } == true
+    val error = folder?.let { ui.biliFolderCollectionErrors[it.mediaId] }
+    val importItems = remember(collections) {
+        collections.map { playlist ->
+            SourcePlaylistImportItem(
+                key = sourceImportKey(source, playlist.mediaId),
+                id = playlist.mediaId,
+                title = playlist.title,
+                coverUrl = playlist.coverUrl,
+                trackCount = playlist.count,
+                source = source,
+                fid = playlist.fid,
+                mid = playlist.mid,
+                bvid = playlist.bvid
+            )
+        }
+    }
+    val itemKeys = remember(importItems) { importItems.map { it.key }.toSet() }
+    val importedKeys = remember(sourceItems, itemKeys) {
+        sourceItems
+            .filter { it.source == source }
+            .map { sourceImportKey(it.source, it.id) }
+            .filter { it in itemKeys }
+            .toSet()
+    }
+    var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val allSelected = importItems.isNotEmpty() && selectedKeys.size == importItems.size
+
+    BackHandler(enabled = folder != null) {
+        selectedFolder = null
+    }
+
+    LaunchedEffect(folder?.mediaId) {
+        val currentFolder = folder ?: return@LaunchedEffect
+        onLoadFolder(currentFolder)
+    }
+
+    LaunchedEffect(folder?.mediaId, itemKeys, importedKeys) {
+        selectedKeys = importedKeys
+    }
+
+    fun toggleItem(key: String) {
+        selectedKeys = if (key in selectedKeys) selectedKeys - key else selectedKeys + key
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        sheetGesturesEnabled = false,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .bottomSheetScrollGuard()
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = authUiState.iconResId),
+                    contentDescription = authUiState.title,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.library_source_import_title, authUiState.title),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (folder == null) {
+                if (folders.isEmpty()) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.library_source_import_empty)) },
+                        supportingContent = {
+                            Text(
+                                text = authUiState.statusText,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(
+                            items = folders,
+                            key = { it.mediaId }
+                        ) { item ->
+                            ListItem(
+                                leadingContent = {
+                                    if (item.coverUrl.isNotBlank()) {
+                                        AsyncImage(
+                                            model = offlineCachedImageRequest(
+                                                context = context,
+                                                data = item.coverUrl,
+                                                sizePx = 160,
+                                                allowHardware = false
+                                            ),
+                                            contentDescription = item.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                            contentDescription = item.title,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                    }
+                                },
+                                headlineContent = {
+                                    Text(
+                                        text = item.title,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        text = pluralStringResource(
+                                            R.plurals.library_song_count,
+                                            item.count,
+                                            item.count
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { selectedFolder = item },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+                }
+            } else {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = folder.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingContent = {
+                        HapticIconButton(onClick = { selectedFolder = null }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back)
+                            )
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+
+                when {
+                    loading && importItems.isEmpty() -> {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.library_bili_folder_loading)) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    !error.isNullOrBlank() && importItems.isEmpty() -> {
+                        ListItem(
+                            headlineContent = {
+                                Text(stringResource(R.string.library_bili_folder_load_failed, error))
+                            },
+                            trailingContent = {
+                                HapticTextButton(onClick = { onLoadFolder(folder) }) {
+                                    Text(stringResource(R.string.action_retry))
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    importItems.isEmpty() -> {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.library_bili_folder_empty)) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(
+                                items = importItems,
+                                key = { it.key }
+                            ) { item ->
+                                val selected = item.key in selectedKeys
+                                ListItem(
+                                    leadingContent = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Checkbox(
+                                                checked = selected,
+                                                onCheckedChange = { toggleItem(item.key) }
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            if (!item.coverUrl.isNullOrBlank()) {
+                                                AsyncImage(
+                                                    model = offlineCachedImageRequest(
+                                                        context = context,
+                                                        data = item.coverUrl,
+                                                        sizePx = 160,
+                                                        allowHardware = false
+                                                    ),
+                                                    contentDescription = item.title,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .size(48.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                                    contentDescription = item.title,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(48.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    headlineContent = {
+                                        Text(
+                                            text = item.title,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            text = pluralStringResource(
+                                                R.plurals.library_song_count,
+                                                item.trackCount,
+                                                item.trackCount
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .clickable { toggleItem(item.key) },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HapticTextButton(
+                        enabled = importItems.isNotEmpty(),
+                        onClick = {
+                            selectedKeys = if (allSelected) {
+                                emptySet()
+                            } else {
+                                itemKeys
+                            }
+                        }
+                    ) {
+                        Text(
+                            if (allSelected) {
+                                stringResource(R.string.action_deselect_all)
+                            } else {
+                                stringResource(R.string.action_select_all)
+                            }
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    HapticTextButton(
+                        enabled = importItems.isNotEmpty(),
+                        onClick = {
+                            val selectedItems = importItems.filter { it.key in selectedKeys }
+                            scope.launch {
+                                val retainedItems = sourceItems.filter { item ->
+                                    item.source == source && sourceImportKey(item.source, item.id) !in itemKeys
+                                }
+                                sourceLibraryRepo.replaceSourceItems(
+                                    source = source,
+                                    selectedItems = retainedItems + selectedItems.map { it.toSourceLibraryItem() }
+                                )
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.library_source_import_updated),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                onDismiss()
+                            }
+                        }
+                    ) {
+                        Text(stringResource(R.string.library_source_import_apply, selectedKeys.size))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -921,6 +1712,53 @@ private fun PlatformAuthEmptyState(
     }
 }
 
+@Composable
+private fun PlatformManageSourceEmptyState(
+    authUiState: PlatformAuthUiState,
+    onManageSource: () -> Unit
+) {
+    val cardShape = RoundedCornerShape(12.dp)
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .clip(cardShape)
+            .clickable(onClick = onManageSource)
+    ) {
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = stringResource(R.string.library_platform_import_playlists, authUiState.title),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            supportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.library_platform_manage_source_empty_hint),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    HapticTextButton(onClick = onManageSource) {
+                        Text(stringResource(R.string.settings_saved_cookie_manage_source))
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            leadingContent = {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(id = authUiState.iconResId),
+                    contentDescription = authUiState.title,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+        )
+    }
+}
+
 private fun maskCookieValue(value: String): String {
     return when {
         value.isBlank() -> ""
@@ -937,6 +1775,7 @@ private fun YouTubeMusicPlaylistList(
     authUiState: PlatformAuthUiState,
     onClick: (YouTubeMusicPlaylist) -> Unit,
     onAuthAction: () -> Unit,
+    onManageSource: () -> Unit,
     onRetry: () -> Unit
 ) {
     val miniPlayerHeight = LocalMiniPlayerHeight.current
@@ -974,48 +1813,44 @@ private fun YouTubeMusicPlaylistList(
                         onAction = onAuthAction
                     )
                 } else {
-                    Card(
-                        shape = cardShape,
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        modifier = Modifier
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .clip(cardShape)
-                    ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    text = error ?: stringResource(R.string.library_youtube_music_empty),
-                                    color = if (error != null) {
-                                        MaterialTheme.colorScheme.error
-                                    } else {
-                                        Color.Unspecified
-                                    }
-                                )
-                            },
-                            supportingContent = {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(
-                                        text = stringResource(R.string.library_youtube_music_hint),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    if (error != null) {
+                    Column {
+                        PlatformManageSourceEmptyState(
+                            authUiState = authUiState,
+                            onManageSource = onManageSource
+                        )
+                        if (error != null) {
+                            Card(
+                                shape = cardShape,
+                                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                                modifier = Modifier
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .clip(cardShape)
+                            ) {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            text = error,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    supportingContent = {
                                         HapticTextButton(onClick = onRetry) {
                                             Text(text = stringResource(R.string.action_retry))
                                         }
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    leadingContent = {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_youtube),
+                                            contentDescription = stringResource(R.string.common_youtube),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(56.dp)
+                                        )
                                     }
-                                }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            leadingContent = {
-                                Icon(
-                                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_youtube),
-                                    contentDescription = stringResource(R.string.common_youtube),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(56.dp)
                                 )
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -1164,12 +1999,15 @@ private fun YouTubeMusicPlaylistList(
 }
 
 @Composable
-private fun BiliPlaylistList(
-    playlists: List<BiliPlaylist>,
+private fun BiliFolderCollectionList(
+    folder: BiliPlaylist,
+    collections: List<BiliPlaylist>,
+    loading: Boolean,
+    error: String?,
     listState: LazyListState,
-    authUiState: PlatformAuthUiState,
     onClick: (BiliPlaylist) -> Unit,
-    onAuthAction: () -> Unit
+    onNavigateUp: () -> Unit,
+    onRetry: () -> Unit
 ) {
     val miniPlayerHeight = LocalMiniPlayerHeight.current
 
@@ -1180,12 +2018,169 @@ private fun BiliPlaylistList(
         modifier = Modifier.fillMaxSize()
     ) {
         val cardShape = RoundedCornerShape(12.dp)
-        if (playlists.isEmpty() && authUiState.connectionState != PlatformConnectionState.Connected) {
-            item {
-                PlatformAuthEmptyState(
-                    authUiState = authUiState,
-                    onAction = onAuthAction
+        item(key = "bili_folder_header_${folder.mediaId}") {
+            Card(
+                shape = cardShape,
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .clip(cardShape)
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = folder.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    leadingContent = {
+                        HapticIconButton(onClick = onNavigateUp) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back)
+                            )
+                        }
+                    }
                 )
+            }
+        }
+
+        when {
+            loading && collections.isEmpty() -> {
+                item(key = "bili_folder_loading") {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.library_bili_folder_loading)) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+            }
+            error != null && collections.isEmpty() -> {
+                item(key = "bili_folder_error") {
+                    Card(
+                        shape = cardShape,
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clip(cardShape)
+                    ) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(R.string.library_bili_folder_load_failed, error),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            trailingContent = {
+                                HapticTextButton(onClick = onRetry) {
+                                    Text(stringResource(R.string.action_retry))
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+            collections.isEmpty() -> {
+                item(key = "bili_folder_empty") {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.library_bili_folder_empty)) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        leadingContent = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(56.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        items(
+            items = collections,
+            key = { it.mediaId }
+        ) { collection ->
+            Card(
+                shape = cardShape,
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .animateItem()
+                    .clip(cardShape)
+                    .clickable { onClick(collection) }
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = collection.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    leadingContent = {
+                        if (collection.coverUrl.isNotEmpty()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current).data(collection.coverUrl).build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(56.dp)
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BiliPlaylistList(
+    playlists: List<BiliPlaylist>,
+    listState: LazyListState,
+    authUiState: PlatformAuthUiState,
+    onClick: (BiliPlaylist) -> Unit,
+    onAuthAction: () -> Unit,
+    onManageSource: () -> Unit
+) {
+    val miniPlayerHeight = LocalMiniPlayerHeight.current
+
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp + miniPlayerHeight),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        val cardShape = RoundedCornerShape(12.dp)
+        if (playlists.isEmpty()) {
+            item {
+                if (authUiState.connectionState == PlatformConnectionState.Connected) {
+                    PlatformManageSourceEmptyState(
+                        authUiState = authUiState,
+                        onManageSource = onManageSource
+                    )
+                } else {
+                    PlatformAuthEmptyState(
+                        authUiState = authUiState,
+                        onAction = onAuthAction
+                    )
+                }
             }
         }
         items(
@@ -1882,7 +2877,8 @@ private fun NeteaseLibraryList(
     authUiState: PlatformAuthUiState,
     onPlaylistClick: (PlaylistSummary) -> Unit,
     onAlbumClick: (AlbumSummary) -> Unit,
-    onAuthAction: () -> Unit
+    onAuthAction: () -> Unit,
+    onManageSource: () -> Unit
 ) {
     val context = LocalContext.current
     val miniPlayerHeight = LocalMiniPlayerHeight.current
@@ -1894,16 +2890,19 @@ private fun NeteaseLibraryList(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxSize()
     ) {
-        if (
-            playlists.isEmpty() &&
-            albums.isEmpty() &&
-            authUiState.connectionState != PlatformConnectionState.Connected
-        ) {
+        if (playlists.isEmpty() && albums.isEmpty()) {
             item {
-                PlatformAuthEmptyState(
-                    authUiState = authUiState,
-                    onAction = onAuthAction
-                )
+                if (authUiState.connectionState == PlatformConnectionState.Connected) {
+                    PlatformManageSourceEmptyState(
+                        authUiState = authUiState,
+                        onManageSource = onManageSource
+                    )
+                } else {
+                    PlatformAuthEmptyState(
+                        authUiState = authUiState,
+                        onAction = onAuthAction
+                    )
+                }
             }
         }
 
@@ -2317,14 +3316,21 @@ private fun FavoritePlaylistList(
                                             }
                                         }
                                         "bili" -> {
+                                            val savedFid = favorite.fid
+                                            val savedBvid = favorite.bvid.orEmpty()
                                             onBiliPlaylistClick(
                                                 BiliPlaylist(
                                                     mediaId = favorite.id,
-                                                    fid = 0L,
-                                                    mid = 0L,
+                                                    fid = savedFid ?: if (savedBvid.isNotBlank()) {
+                                                        BILI_SINGLE_VIDEO_FID
+                                                    } else {
+                                                        0L
+                                                    },
+                                                    mid = favorite.mid ?: 0L,
                                                     title = favorite.name,
                                                     count = favorite.trackCount,
-                                                    coverUrl = favorite.coverUrl.orEmpty()
+                                                    coverUrl = favorite.coverUrl.orEmpty(),
+                                                    bvid = savedBvid
                                                 )
                                             )
                                         }

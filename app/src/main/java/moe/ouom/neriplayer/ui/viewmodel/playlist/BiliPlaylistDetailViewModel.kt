@@ -36,7 +36,10 @@ import kotlinx.parcelize.Parcelize
 import moe.ouom.neriplayer.core.api.bili.buildBiliPartSong
 import moe.ouom.neriplayer.core.api.bili.BiliClient
 import moe.ouom.neriplayer.core.di.AppContainer
+import moe.ouom.neriplayer.ui.viewmodel.tab.BILI_COLLECTION_FID
+import moe.ouom.neriplayer.ui.viewmodel.tab.BILI_SINGLE_VIDEO_FID
 import moe.ouom.neriplayer.ui.viewmodel.tab.BiliPlaylist
+import moe.ouom.neriplayer.ui.viewmodel.tab.normalizeBiliPlaylistTitle
 import java.io.IOException
 
 /** Bilibili 视频条目数据模型 */
@@ -47,8 +50,17 @@ data class BiliVideoItem(
     val title: String,
     val uploader: String,
     val coverUrl: String,
-    val durationSec: Int
-) : Parcelable
+    val durationSec: Int,
+    val cid: Long = 0L,
+    val page: Int = 0
+) : Parcelable {
+    val stableKey: String
+        get() = when {
+            cid > 0L -> "$id:$cid"
+            bvid.isNotBlank() -> bvid
+            else -> id.toString()
+        }
+}
 
 /** Bilibili 收藏夹详情页 UI 状态 */
 data class BiliPlaylistDetailUiState(
@@ -72,7 +84,7 @@ class BiliPlaylistDetailViewModel(application: Application) : AndroidViewModel(a
 
         _uiState.value = BiliPlaylistDetailUiState(
             loading = true,
-            header = playlist,
+            header = playlist.copy(title = normalizeBiliPlaylistTitle(playlist.title)),
             videos = emptyList()
         )
         loadContent()
@@ -94,32 +106,73 @@ class BiliPlaylistDetailViewModel(application: Application) : AndroidViewModel(a
         }
     }
 
+    suspend fun getVideoInfo(video: BiliVideoItem): BiliClient.VideoBasicInfo {
+        return withContext(Dispatchers.IO) {
+            if (video.bvid.isNotBlank()) {
+                client.getVideoBasicInfoByBvid(video.bvid)
+            } else {
+                client.getVideoBasicInfoByAvid(video.id)
+            }
+        }
+    }
+
     private fun loadContent() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true, error = null)
             try {
-                val items = withContext(Dispatchers.IO) {
-                    client.getAllFavFolderItems(mediaId)
-                }
+                val header = _uiState.value.header
+                val videos = if (header?.fid == BILI_SINGLE_VIDEO_FID) {
+                    withContext(Dispatchers.IO) {
+                        val info = if (header.bvid.isNotBlank()) {
+                            client.getVideoBasicInfoByBvid(header.bvid)
+                        } else {
+                            client.getVideoBasicInfoByAvid(header.mediaId)
+                        }
+                        info.toDisplayItems(fallbackCoverUrl = header.coverUrl)
+                    }
+                } else if (header?.fid == BILI_COLLECTION_FID) {
+                    withContext(Dispatchers.IO) {
+                        client.getAllSeasonArchives(
+                            mid = header.mid,
+                            seasonId = header.mediaId
+                        ).map { item ->
+                            BiliVideoItem(
+                                id = item.aid,
+                                bvid = item.bvid,
+                                title = item.title,
+                                uploader = item.author,
+                                coverUrl = item.coverUrl,
+                                durationSec = item.durationSec
+                            )
+                        }
+                    }
+                } else {
+                    val items = withContext(Dispatchers.IO) {
+                        client.getAllFavFolderItems(mediaId)
+                    }
 
-                val videos = items.mapNotNull {
-                    // 仅保留视频类型的内容
-                    if (it.type == 2) {
-                        BiliVideoItem(
-                            id = it.id,
-                            bvid = it.bvid ?: "",
-                            title = it.title,
-                            uploader = it.upperName,
-                            coverUrl = it.coverUrl.replaceFirst("http://", "https://"),
-                            durationSec = it.durationSec
-                        )
-                    } else {
-                        null
+                    items.mapNotNull {
+                        // 仅保留视频类型的内容
+                        if (it.type == 2) {
+                            BiliVideoItem(
+                                id = it.id,
+                                bvid = it.bvid ?: "",
+                                title = it.title,
+                                uploader = it.upperName,
+                                coverUrl = it.coverUrl
+                                    .replaceFirst("http://", "https://")
+                                    .ifBlank { header?.coverUrl.orEmpty() },
+                                durationSec = it.durationSec
+                            )
+                        } else {
+                            null
+                        }
                     }
                 }
 
                 _uiState.value = _uiState.value.copy(
                     loading = false,
+                    header = header?.copy(count = videos.size),
                     videos = videos
                 )
 
@@ -136,6 +189,37 @@ class BiliPlaylistDetailViewModel(application: Application) : AndroidViewModel(a
             }
         }
     }
+
+    private fun BiliClient.VideoBasicInfo.toDisplayItems(fallbackCoverUrl: String): List<BiliVideoItem> {
+        val cover = fallbackCoverUrl.ifBlank { coverUrl }
+        if (pages.size > 1) {
+            return pages.map { page ->
+                BiliVideoItem(
+                    id = aid,
+                    bvid = bvid,
+                    title = normalizeBiliPlaylistTitle(page.part.ifBlank { "${title} P${page.page}" }),
+                    uploader = ownerName,
+                    coverUrl = cover,
+                    durationSec = page.durationSec.takeIf { it > 0 } ?: durationSec,
+                    cid = page.cid,
+                    page = page.page
+                )
+            }
+        }
+
+        return listOf(
+            BiliVideoItem(
+                id = aid,
+                bvid = bvid,
+                title = normalizeBiliPlaylistTitle(title),
+                uploader = ownerName,
+                coverUrl = cover,
+                durationSec = durationSec.takeIf { it > 0 } ?: pages.firstOrNull()?.durationSec.orZero()
+            )
+        )
+    }
+
+    private fun Int?.orZero(): Int = this ?: 0
 
     /**
      * 将 Bilibili 视频的分P转换为通用的 SongItem

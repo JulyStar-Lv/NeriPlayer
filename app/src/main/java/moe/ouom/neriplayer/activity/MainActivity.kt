@@ -215,8 +215,8 @@ class MainActivity : ComponentActivity() {
             val systemDark = isSystemInDarkTheme()
             val useDark = remember(forceDark, followSystemDark, systemDark) {
                 when {
-                    forceDark -> true
                     followSystemDark -> systemDark
+                    forceDark -> true
                     else -> false
                 }
             }
@@ -762,6 +762,11 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
+    override fun onStop() {
+        PlayerManager.flushPlaybackStatsBlocking("activity_stop")
+        super.onStop()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         hasWindowFocusForClipboardInspection = hasFocus
@@ -1062,6 +1067,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        PlayerManager.flushPlaybackStatsBlocking("activity_destroy")
         clipboardInviteInspectJob?.cancel()
         externalAudioImportJob?.cancel()
         externalAudioMetadataHydrationJob?.cancel()

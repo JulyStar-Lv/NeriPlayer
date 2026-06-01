@@ -137,6 +137,7 @@ import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsLyricsOffset
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsMotionSection
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsPlaybackSection
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.SettingsStorageCacheSection
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeMode
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeModeActionButton
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeSeedListItem
 import moe.ouom.neriplayer.ui.screen.tab.settings.component.UiScaleListItem
@@ -167,8 +168,9 @@ fun SettingsScreen(
     listState: androidx.compose.foundation.lazy.LazyListState,
     dynamicColor: Boolean,
     onDynamicColorChange: (Boolean) -> Unit,
+    themeMode: ThemeMode,
     isDarkTheme: Boolean,
-    onThemeToggleRequest: (Offset, Float) -> Unit,
+    onThemeModeRequest: (ThemeMode, Offset, Float) -> Unit,
     preferredQuality: String,
     onQualityChange: (String) -> Unit,
     youtubePreferredQuality: String,
@@ -186,10 +188,8 @@ fun SettingsScreen(
     onLyricBlurEnabledChange: (Boolean) -> Unit,
     lyricBlurAmount: Float,
     onLyricBlurAmountChange: (Float) -> Unit,
-    cloudMusicLyricDefaultOffsetMs: Long,
-    onCloudMusicLyricDefaultOffsetMsChange: (Long) -> Unit,
-    qqMusicLyricDefaultOffsetMs: Long,
-    onQqMusicLyricDefaultOffsetMsChange: (Long) -> Unit,
+    lyricDefaultOffsetMs: Long,
+    onLyricDefaultOffsetMsChange: (Long) -> Unit,
     advancedLyricsEnabled: Boolean,
     onAdvancedLyricsEnabledChange: (Boolean) -> Unit,
     advancedBlurEnabled: Boolean,
@@ -226,6 +226,8 @@ fun SettingsScreen(
     onHapticFeedbackEnabledChange: (Boolean) -> Unit,
     showCoverSourceBadge: Boolean,
     onShowCoverSourceBadgeChange: (Boolean) -> Unit,
+    nowPlayingKeepScreenOn: Boolean,
+    onNowPlayingKeepScreenOnChange: (Boolean) -> Unit,
     showNowPlayingTitle: Boolean,
     onShowNowPlayingTitleChange: (Boolean) -> Unit,
     showNowPlayingProgressQualitySwitch: Boolean,
@@ -777,8 +779,9 @@ fun SettingsScreen(
                     ) {
                         Text(stringResource(R.string.settings_title))
                         ThemeModeActionButton(
+                            themeMode = themeMode,
                             isDarkTheme = isDarkTheme,
-                            onToggleRequest = onThemeToggleRequest
+                            onModeRequest = onThemeModeRequest
                         )
                     }
                 },
@@ -1196,6 +1199,29 @@ fun SettingsScreen(
                         )
 
                         ListItem(
+                            modifier = Modifier.settingsItemClickable {
+                                onNowPlayingKeepScreenOnChange(!nowPlayingKeepScreenOn)
+                            },
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Brightness4,
+                                    contentDescription = stringResource(R.string.settings_nowplaying_keep_screen_on),
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            headlineContent = { Text(stringResource(R.string.settings_nowplaying_keep_screen_on)) },
+                            supportingContent = { Text(stringResource(R.string.settings_nowplaying_keep_screen_on_desc)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = nowPlayingKeepScreenOn,
+                                    onCheckedChange = onNowPlayingKeepScreenOnChange
+                                )
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+
+                        ListItem(
                             leadingContent = {
                                 Icon(
                                     imageVector = Icons.Outlined.Tune,
@@ -1444,10 +1470,8 @@ fun SettingsScreen(
                       expanded = lyricsOffsetExpanded,
                       arrowRotation = lyricsOffsetArrowRotation,
                       onExpandedChange = { lyricsOffsetExpanded = it },
-                      cloudMusicLyricDefaultOffsetMs = cloudMusicLyricDefaultOffsetMs,
-                      onCloudMusicLyricDefaultOffsetMsChange = onCloudMusicLyricDefaultOffsetMsChange,
-                      qqMusicLyricDefaultOffsetMs = qqMusicLyricDefaultOffsetMs,
-                      onQqMusicLyricDefaultOffsetMsChange = onQqMusicLyricDefaultOffsetMsChange
+                      lyricDefaultOffsetMs = lyricDefaultOffsetMs,
+                      onLyricDefaultOffsetMsChange = onLyricDefaultOffsetMsChange
                   )
               }
 

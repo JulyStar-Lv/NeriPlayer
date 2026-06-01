@@ -38,6 +38,7 @@ import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.data.auth.common.SavedCookieAuthHealth
 import moe.ouom.neriplayer.data.auth.common.SavedCookieAuthState
 import moe.ouom.neriplayer.data.auth.common.parseRawCookieText
+import moe.ouom.neriplayer.data.auth.netease.NeteaseAuthEvents
 import org.json.JSONObject
 
 data class NeteaseAuthUiState(
@@ -219,7 +220,7 @@ class NeteaseAuthViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.value = _uiState.value.copy(isLoggedIn = true)
                     emitSnack("Login successful")
                     _events.tryEmit(NeteaseAuthEvent.ShowCookies(cookieStore.toMap()))
-                    _events.tryEmit(NeteaseAuthEvent.LoginSuccess)
+                    notifyLoginSuccess()
                 } else {
                     val msg = obj.optString("msg", "Login failed, please try another method")
                     emitSnack("Login failed: $msg")
@@ -255,7 +256,7 @@ class NeteaseAuthViewModel(app: Application) : AndroidViewModel(app) {
 
             _uiState.value = _uiState.value.copy(isLoggedIn = true)
             _events.tryEmit(NeteaseAuthEvent.ShowCookies(cookieStore.toMap()))
-            _events.tryEmit(NeteaseAuthEvent.LoginSuccess)
+            notifyLoginSuccess()
             emitSnack(getApplication<Application>().getString(R.string.auth_cookie_saved))
         }
     }
@@ -287,5 +288,10 @@ class NeteaseAuthViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun emitSnack(msg: String) {
         _events.tryEmit(NeteaseAuthEvent.ShowSnack(msg))
+    }
+
+    private fun notifyLoginSuccess() {
+        NeteaseAuthEvents.notifyLoginSuccess()
+        _events.tryEmit(NeteaseAuthEvent.LoginSuccess)
     }
 }

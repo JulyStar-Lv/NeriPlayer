@@ -42,6 +42,7 @@ private const val KEY_MID = "mid"
 private const val KEY_TITLE = "title"
 private const val KEY_COUNT = "count"
 private const val KEY_COVER_URL = "coverUrl"
+private const val KEY_BVID = "bvid"
 private const val KEY_PLAYLIST_ID = "playlistId"
 private const val KEY_BROWSE_ID = "browseId"
 private const val KEY_SUBTITLE = "subtitle"
@@ -116,7 +117,8 @@ fun restoreBiliPlaylist(map: Map<*, *>?): BiliPlaylist? {
         mid = mid,
         title = title,
         count = count,
-        coverUrl = coverUrl
+        coverUrl = coverUrl,
+        bvid = map[KEY_BVID] as? String ?: ""
     )
 }
 
@@ -161,7 +163,8 @@ fun BiliPlaylist.toSaveMap(): HashMap<String, Any?> = hashMapOf(
     KEY_MID to mid,
     KEY_TITLE to title,
     KEY_COUNT to count,
-    KEY_COVER_URL to coverUrl
+    KEY_COVER_URL to coverUrl,
+    KEY_BVID to bvid
 )
 
 fun YouTubeMusicPlaylist.toSaveMap(): HashMap<String, Any?> = hashMapOf(

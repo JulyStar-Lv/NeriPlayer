@@ -36,6 +36,7 @@ import android.os.Looper
 import android.view.PixelCopy
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.EaseInOutCubic
@@ -185,6 +186,8 @@ import moe.ouom.neriplayer.ui.screen.playlist.BiliPlaylistDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.LocalPlaylistDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.NeteaseAlbumDetailScreen
 import moe.ouom.neriplayer.ui.screen.playlist.NeteasePlaylistDetailScreen
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeMode
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.resolveThemeMode
 import moe.ouom.neriplayer.ui.theme.NeriTheme
 import moe.ouom.neriplayer.ui.view.HyperBackground
 import moe.ouom.neriplayer.ui.viewmodel.debug.LogViewerScreen
@@ -554,10 +557,8 @@ private fun NeriAppContent(
     val themeColorPalette by repo.themeColorPaletteFlow.collectAsState(initial = ThemeDefaults.PRESET_COLORS)
     val lyricBlurEnabled by repo.lyricBlurEnabledFlow.collectAsState(initial = true)
     val lyricBlurAmount by repo.lyricBlurAmountFlow.collectAsState(initial = 1.5f)
-    val cloudMusicLyricDefaultOffsetMs by repo.cloudMusicLyricDefaultOffsetMsFlow
+    val lyricDefaultOffsetMs by repo.lyricDefaultOffsetMsFlow
         .collectAsState(initial = startupPlaybackPreferences.cloudMusicLyricDefaultOffsetMs)
-    val qqMusicLyricDefaultOffsetMs by repo.qqMusicLyricDefaultOffsetMsFlow
-        .collectAsState(initial = startupPlaybackPreferences.qqMusicLyricDefaultOffsetMs)
     val advancedLyricsEnabled by repo.advancedLyricsEnabledFlow.collectAsState(initial = true)
     val advancedBlurEnabled by repo.advancedBlurEnabledFlow.collectAsState(initial = true)
     val advancedBlurAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -577,6 +578,7 @@ private fun NeriAppContent(
     val backgroundImageAlpha by repo.backgroundImageAlphaFlow.collectAsState(initial = 0.3f)
     val hapticFeedbackEnabled by repo.hapticFeedbackEnabledFlow.collectAsState(initial = true)
     val showCoverSourceBadge by repo.showCoverSourceBadgeFlow.collectAsState(initial = true)
+    val nowPlayingKeepScreenOn by repo.nowPlayingKeepScreenOnFlow.collectAsState(initial = true)
     val showNowPlayingTitle by repo.nowPlayingShowTitleFlow.collectAsState(initial = true)
     val showNowPlayingProgressQualitySwitch by repo.nowPlayingProgressShowQualitySwitchFlow.collectAsState(initial = true)
     val showNowPlayingProgressAudioCodec by repo.nowPlayingProgressShowAudioCodecFlow.collectAsState(initial = true)
@@ -683,7 +685,7 @@ private fun NeriAppContent(
         val exactStartupPlaybackPreferences = withContext(Dispatchers.IO) {
             readPlaybackPreferenceSnapshot(application)
         }
-        val startupRestoreSnapshot = PlayerManager.preloadRestoredStateSnapshot(
+        val startupRestoreSnapshot = preloadRestoredStateSnapshot(
             app = application,
             keepLastPlaybackProgressEnabled =
                 exactStartupPlaybackPreferences.keepLastPlaybackProgress,
@@ -753,56 +755,6 @@ private fun NeriAppContent(
                 }
             }
 
-        // 播放统计：追踪实际收听时长
-        launch {
-            var trackingSong: SongItem? = null
-            var sessionStartTime = 0L
-            var accumulatedMs = 0L
-            var wasPlaying = false
-
-            fun flushSession() {
-                val song = trackingSong ?: return
-                if (wasPlaying && sessionStartTime > 0L) {
-                    accumulatedMs += System.currentTimeMillis() - sessionStartTime
-                }
-                if (accumulatedMs > 0) {
-                    AppContainer.playbackStatsRepo.recordSession(song, accumulatedMs)
-                }
-                accumulatedMs = 0L
-                sessionStartTime = 0L
-                wasPlaying = false
-            }
-
-            launch {
-                PlayerManager.currentSongFlow.collect { song ->
-                    if (song != null && song.stableKey() != trackingSong?.stableKey()) {
-                        flushSession()
-                        trackingSong = song
-                        if (PlayerManager.isPlayingFlow.value) {
-                            wasPlaying = true
-                            sessionStartTime = System.currentTimeMillis()
-                        }
-                    } else if (song == null) {
-                        flushSession()
-                        trackingSong = null
-                    }
-                }
-            }
-
-            PlayerManager.isPlayingFlow.collect { playing ->
-                if (trackingSong == null) return@collect
-                if (playing && !wasPlaying) {
-                    wasPlaying = true
-                    sessionStartTime = System.currentTimeMillis()
-                } else if (!playing && wasPlaying) {
-                    if (sessionStartTime > 0L) {
-                        accumulatedMs += System.currentTimeMillis() - sessionStartTime
-                    }
-                    wasPlaying = false
-                    sessionStartTime = 0L
-                }
-            }
-        }
     }
 
     LaunchedEffect(storedFollowSystemDark, pendingFollowSystemDark) {
@@ -849,7 +801,7 @@ private fun NeriAppContent(
             hasCachedSample = cachedSample != null
         )
         if (warmupDelayMillis > 0L) {
-            kotlinx.coroutines.delay(warmupDelayMillis)
+            delay(warmupDelayMillis)
         }
 
         coverSeedHex = CoverArtColorCache.preload(context, displayCoverUrl)?.seedHex ?: coverSeedHex
@@ -870,10 +822,12 @@ private fun NeriAppContent(
         )
     }
 
-    val isDark = when {
-        forceDark -> true
-        followSystemDark -> isSystemInDarkTheme()
-        else -> false
+    val systemDark = isSystemInDarkTheme()
+    val themeMode = resolveThemeMode(followSystemDark, forceDark)
+    val isDark = when (themeMode) {
+        ThemeMode.Auto -> systemDark
+        ThemeMode.Dark -> true
+        ThemeMode.Light -> false
     }
     SideEffect {
         updateStatusBarIconAppearance(
@@ -897,7 +851,11 @@ private fun NeriAppContent(
         }
     }
 
-    fun requestThemeToggle(originInWindow: Offset, startRadiusPx: Float) {
+    fun requestThemeModeChange(
+        targetMode: ThemeMode,
+        originInWindow: Offset,
+        startRadiusPx: Float
+    ) {
         if (
             themeRevealCaptureInFlight ||
             pendingFollowSystemDark != null ||
@@ -907,7 +865,29 @@ private fun NeriAppContent(
             return
         }
 
-        val nextDark = !isDark
+        val nextFollowSystemDark = targetMode == ThemeMode.Auto
+        val nextForceDark = targetMode == ThemeMode.Dark
+        val nextDark = when (targetMode) {
+            ThemeMode.Auto -> systemDark
+            ThemeMode.Dark -> true
+            ThemeMode.Light -> false
+        }
+
+        if (nextDark == isDark) {
+            pendingFollowSystemDark = nextFollowSystemDark
+            pendingForceDark = nextForceDark
+            scope.launch {
+                try {
+                    repo.setFollowSystemDark(nextFollowSystemDark)
+                    repo.setForceDark(nextForceDark)
+                } finally {
+                    pendingFollowSystemDark = null
+                    pendingForceDark = null
+                }
+            }
+            return
+        }
+
         val activity = context as? Activity
         val captureView = activity?.window?.decorView?.rootView ?: rootView.rootView
         val captureToken = themeRevealCaptureToken + 1
@@ -940,10 +920,10 @@ private fun NeriAppContent(
                 themeRevealStartRadiusPx = startRadiusPx.coerceAtLeast(1f)
             }
             try {
-                pendingFollowSystemDark = false
-                pendingForceDark = nextDark
-                repo.setFollowSystemDark(false)
-                repo.setForceDark(nextDark)
+                pendingFollowSystemDark = nextFollowSystemDark
+                pendingForceDark = nextForceDark
+                repo.setFollowSystemDark(nextFollowSystemDark)
+                repo.setForceDark(nextForceDark)
             } finally {
                 if (themeRevealCaptureToken == captureToken) {
                     themeRevealCaptureJob = null
@@ -1066,6 +1046,22 @@ private fun NeriAppContent(
             DisposableEffect(showNowPlaying, effectiveAudioReactiveEnabled) {
                 AudioReactive.enabled = showNowPlaying && effectiveAudioReactiveEnabled
                 onDispose { AudioReactive.enabled = false }
+            }
+
+            val activity = remember(context) { context.findActivity() }
+            DisposableEffect(activity, showNowPlaying, nowPlayingKeepScreenOn) {
+                val window = activity?.window
+                val keepScreenOnFlag = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                val shouldKeepScreenOn = showNowPlaying && nowPlayingKeepScreenOn
+                val wasKeepScreenOn = window?.attributes?.flags?.and(keepScreenOnFlag) == keepScreenOnFlag
+                if (shouldKeepScreenOn) {
+                    window?.addFlags(keepScreenOnFlag)
+                }
+                onDispose {
+                    if (shouldKeepScreenOn && !wasKeepScreenOn) {
+                        window?.clearFlags(keepScreenOnFlag)
+                    }
+                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1244,7 +1240,9 @@ private fun NeriAppContent(
                                         showRadarCard = showHomeRadarCard,
                                         showRecommendedCard = showHomeRecommendedCard,
                                         onOpenRecentScreen = { navController.navigate(Destinations.Recent.route) },
-                                        onSongClick = ::playSongsAndOpenNowPlaying
+                                        onSongClick = ::playSongsAndOpenNowPlaying,
+                                        onPlayBiliAudio = ::playBiliAudioAndOpenNowPlaying,
+                                        onPlayBiliParts = ::playBiliPartsAndOpenNowPlaying
                                     )
                                 }
 
@@ -1398,6 +1396,7 @@ private fun NeriAppContent(
                                 ) {
                                     LibraryHostScreen(
                                         onSongClick = ::playSongsAndOpenNowPlaying,
+                                        onPlayBiliAudio = ::playBiliAudioAndOpenNowPlaying,
                                         onPlayParts = ::playBiliPartsAndOpenNowPlaying,
                                         onOpenRecent = { navController.navigate(Destinations.Recent.route) },
                                         onOpenStats = { navController.navigate(Destinations.PlaybackStats.route) }
@@ -1489,8 +1488,9 @@ private fun NeriAppContent(
                                     SettingsHostScreen(
                                         dynamicColor = dynamicColorEnabled,
                                         onDynamicColorChange = { scope.launch { repo.setDynamicColor(it) } },
+                                        themeMode = themeMode,
                                         isDarkTheme = isDark,
-                                        onThemeToggleRequest = ::requestThemeToggle,
+                                        onThemeModeRequest = ::requestThemeModeChange,
                                         preferredQuality = preferredQuality,
                                         onQualityChange = { scope.launch { repo.setAudioQuality(it) } },
                                         youtubePreferredQuality = youtubePreferredQuality,
@@ -1514,10 +1514,10 @@ private fun NeriAppContent(
                                         onLyricBlurAmountChange = { amount ->
                                             scope.launch { repo.setLyricBlurAmount(amount) }
                                         },
-                                        cloudMusicLyricDefaultOffsetMs = cloudMusicLyricDefaultOffsetMs,
-                                        onCloudMusicLyricDefaultOffsetMsChange = { offsetMs ->
+                                        lyricDefaultOffsetMs = lyricDefaultOffsetMs,
+                                        onLyricDefaultOffsetMsChange = { offsetMs ->
                                             scope.launch {
-                                                val previousOffset = cloudMusicLyricDefaultOffsetMs
+                                                val previousOffset = lyricDefaultOffsetMs
                                                 if (previousOffset == offsetMs) {
                                                     return@launch
                                                 }
@@ -1526,32 +1526,19 @@ private fun NeriAppContent(
                                                     previousDefaultOffsetMs = previousOffset,
                                                     newDefaultOffsetMs = offsetMs
                                                 )
-                                                runCatching {
-                                                    repo.setCloudMusicLyricDefaultOffsetMs(offsetMs)
-                                                }.onFailure {
-                                                    PlayerManager.rebaseUserLyricOffsetsForSource(
-                                                        targetSource = MusicPlatform.CLOUD_MUSIC,
-                                                        previousDefaultOffsetMs = offsetMs,
-                                                        newDefaultOffsetMs = previousOffset
-                                                    )
-                                                }.getOrThrow()
-                                            }
-                                        },
-                                        qqMusicLyricDefaultOffsetMs = qqMusicLyricDefaultOffsetMs,
-                                        onQqMusicLyricDefaultOffsetMsChange = { offsetMs ->
-                                            scope.launch {
-                                                val previousOffset = qqMusicLyricDefaultOffsetMs
-                                                if (previousOffset == offsetMs) {
-                                                    return@launch
-                                                }
                                                 PlayerManager.rebaseUserLyricOffsetsForSource(
                                                     targetSource = MusicPlatform.QQ_MUSIC,
                                                     previousDefaultOffsetMs = previousOffset,
                                                     newDefaultOffsetMs = offsetMs
                                                 )
                                                 runCatching {
-                                                    repo.setQqMusicLyricDefaultOffsetMs(offsetMs)
+                                                    repo.setLyricDefaultOffsetMs(offsetMs)
                                                 }.onFailure {
+                                                    PlayerManager.rebaseUserLyricOffsetsForSource(
+                                                        targetSource = MusicPlatform.CLOUD_MUSIC,
+                                                        previousDefaultOffsetMs = offsetMs,
+                                                        newDefaultOffsetMs = previousOffset
+                                                    )
                                                     PlayerManager.rebaseUserLyricOffsetsForSource(
                                                         targetSource = MusicPlatform.QQ_MUSIC,
                                                         previousDefaultOffsetMs = offsetMs,
@@ -1643,6 +1630,10 @@ private fun NeriAppContent(
                                         showCoverSourceBadge = showCoverSourceBadge,
                                         onShowCoverSourceBadgeChange = { enabled ->
                                             scope.launch { repo.setShowCoverSourceBadge(enabled) }
+                                        },
+                                        nowPlayingKeepScreenOn = nowPlayingKeepScreenOn,
+                                        onNowPlayingKeepScreenOnChange = { enabled ->
+                                            scope.launch { repo.setNowPlayingKeepScreenOn(enabled) }
                                         },
                                         showNowPlayingTitle = showNowPlayingTitle,
                                         onShowNowPlayingTitleChange = { enabled ->

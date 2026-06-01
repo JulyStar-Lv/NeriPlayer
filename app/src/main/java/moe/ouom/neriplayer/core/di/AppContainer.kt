@@ -169,6 +169,16 @@ object AppContainer {
             .addInterceptor { chain ->
                 val request = chain.request()
                 val host = request.url.host.lowercase()
+                if (isBiliImageHost(host)) {
+                    val builder = request.newBuilder()
+                    if (request.header("Referer").isNullOrBlank()) {
+                        builder.header("Referer", BILI_WEB_REFERER)
+                    }
+                    if (request.header("User-Agent").isNullOrBlank()) {
+                        builder.header("User-Agent", BILI_IMAGE_USER_AGENT)
+                    }
+                    return@addInterceptor chain.proceed(builder.build())
+                }
                 if (!isYouTubeHost(host)) {
                     return@addInterceptor chain.proceed(request)
                 }
@@ -359,9 +369,17 @@ object AppContainer {
         return isTrustedYouTubeHost(host)
     }
 
+    private fun isBiliImageHost(host: String): Boolean {
+        return host == "hdslb.com" || host.endsWith(".hdslb.com")
+    }
+
     private fun isYouTubeInnertubeRequest(request: Request): Boolean {
         val host = request.url.host.lowercase()
         val path = request.url.encodedPath.lowercase()
         return isYouTubeInnertubeHost(host) || path.startsWith("/youtubei/")
     }
+
+    private const val BILI_WEB_REFERER = "https://www.bilibili.com"
+    private const val BILI_IMAGE_USER_AGENT =
+        "Mozilla/5.0 (Linux; Android 10; NeriPlayer) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 }

@@ -99,12 +99,12 @@ data class SyncPlaylist(
 @Serializable
 data class SyncSong(
     @ProtoNumber(1) val id: Long,
-    @ProtoNumber(2) val name: String,
-    @ProtoNumber(3) val artist: String,
-    @ProtoNumber(4) val album: String,
-    @ProtoNumber(5) val albumId: Long,
-    @ProtoNumber(6) val durationMs: Long,
-    @ProtoNumber(7) val coverUrl: String?,
+    @ProtoNumber(2) val name: String = "",
+    @ProtoNumber(3) val artist: String = "",
+    @ProtoNumber(4) val album: String = "",
+    @ProtoNumber(5) val albumId: Long = 0L,
+    @ProtoNumber(6) val durationMs: Long = 0L,
+    @ProtoNumber(7) val coverUrl: String? = null,
     @ProtoNumber(8) val mediaUri: String? = null,
     @ProtoNumber(9) val addedAt: Long = System.currentTimeMillis(),
     @ProtoNumber(10) val matchedLyric: String? = null,
@@ -237,18 +237,21 @@ data class SyncRecentPlayDeletion(
 @Serializable
 data class SyncFavoritePlaylist(
     @ProtoNumber(1) val id: Long,
-    @ProtoNumber(2) val name: String,
-    @ProtoNumber(3) val coverUrl: String?,
-    @ProtoNumber(4) val trackCount: Int,
-    @ProtoNumber(5) val source: String,
-    @ProtoNumber(6) val songs: List<SyncSong>,
-    @ProtoNumber(7) val addedTime: Long,
+    @ProtoNumber(2) val name: String = "",
+    @ProtoNumber(3) val coverUrl: String? = null,
+    @ProtoNumber(4) val trackCount: Int = 0,
+    @ProtoNumber(5) val source: String = "",
+    @ProtoNumber(6) val songs: List<SyncSong> = emptyList(),
+    @ProtoNumber(7) val addedTime: Long = 0L,
     @ProtoNumber(8) val modifiedAt: Long = addedTime,
     @ProtoNumber(9) val isDeleted: Boolean = false,
     @ProtoNumber(10) val sortOrder: Long = addedTime,
     @ProtoNumber(11) val browseId: String? = null,
     @ProtoNumber(12) val playlistId: String? = null,
-    @ProtoNumber(13) val subtitle: String? = null
+    @ProtoNumber(13) val subtitle: String? = null,
+    @ProtoNumber(14) val fid: Long? = null,
+    @ProtoNumber(15) val mid: Long? = null,
+    @ProtoNumber(16) val bvid: String? = null
 ) {
     companion object {
         fun fromFavoritePlaylist(playlist: FavoritePlaylist, context: Context? = null): SyncFavoritePlaylist {
@@ -266,7 +269,10 @@ data class SyncFavoritePlaylist(
                     sortOrder = playlist.sortOrder,
                     browseId = playlist.browseId,
                     playlistId = playlist.playlistId,
-                    subtitle = playlist.subtitle
+                    subtitle = playlist.subtitle,
+                    fid = playlist.fid,
+                    mid = playlist.mid,
+                    bvid = playlist.bvid
                 )
             }
             val syncedSongs = playlist.songs.mapNotNull { SyncSong.fromSongItemOrNull(it, context) }
@@ -291,7 +297,10 @@ data class SyncFavoritePlaylist(
                 sortOrder = playlist.sortOrder,
                 browseId = playlist.browseId,
                 playlistId = playlist.playlistId,
-                subtitle = playlist.subtitle
+                subtitle = playlist.subtitle,
+                fid = playlist.fid,
+                mid = playlist.mid,
+                bvid = playlist.bvid
             )
         }
     }
@@ -306,6 +315,9 @@ data class SyncFavoritePlaylist(
             browseId = browseId,
             playlistId = playlistId,
             subtitle = subtitle,
+            fid = fid,
+            mid = mid,
+            bvid = bvid,
             songs = songs.map { it.toSongItem() },
             addedTime = addedTime,
             sortOrder = sortOrder,

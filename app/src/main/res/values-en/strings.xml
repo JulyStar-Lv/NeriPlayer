@@ -54,6 +54,13 @@
     <string name="player_play_all">Play All</string>
     <string name="player_play_selected">Play Selected</string>
 
+    <!-- Home Screen Widgets -->
+    <string name="widget_player_large_name">Music · Large Card</string>
+    <string name="widget_player_compact_name">Music · Compact Pill</string>
+    <string name="widget_player_cover_name">Music · Cover Card</string>
+    <string name="widget_player_open_app">Open NeriPlayer</string>
+    <string name="widget_player_cover_art">Cover art</string>
+
     <!-- Playlist -->
     <string name="playlist_title">Playlist</string>
     <string name="playlist_current">Current Playlist</string>
@@ -171,12 +178,15 @@
     <string name="settings_dynamic_color_desc">Follow cover theme color</string>
     <string name="settings_theme_toggle_dark">Switch to dark theme</string>
     <string name="settings_theme_toggle_light">Switch to light theme</string>
+    <string name="settings_theme_toggle_auto">Switch to system theme</string>
     <string name="settings_force_dark">Force Dark Mode</string>
     <string name="settings_force_dark_desc">Manually specify when not following system</string>
     <string name="settings_cover_source_badge">Show song source on cover</string>
     <string name="settings_cover_source_badge_desc">Display the platform badge for the current song on the cover area</string>
     <string name="settings_nowplaying_title">Show &quot;Now Playing&quot; title</string>
     <string name="settings_nowplaying_title_desc">Controls whether the &quot;Now Playing&quot; title appears at the top of the player page</string>
+    <string name="settings_nowplaying_keep_screen_on">Keep screen on in Now Playing</string>
+    <string name="settings_nowplaying_keep_screen_on_desc">Prevent the screen from timing out while the Now Playing page is open</string>
     <string name="settings_nowplaying_progress_quality_switch">Show current quality above progress bar</string>
     <string name="settings_nowplaying_progress_quality_switch_desc">Shown above the progress bar; quality switching is available in More Options</string>
     <string name="settings_nowplaying_progress_audio_codec">Show codec above progress bar</string>
@@ -419,6 +429,8 @@
     <string name="music_search_cover">Search Cover</string>
     <string name="music_auto_fill">Auto Fill</string>
     <string name="music_auto_fill_hint">Auto fill info from search results</string>
+    <string name="music_auto_fill_custom_title">Custom song name</string>
+    <string name="music_auto_fill_custom_title_hint">Enter the song name used for auto fill search</string>
     <string name="music_save_changes">Save</string>
     <string name="music_info_saved">Song info saved</string>
     <string name="music_select_result">Select search result</string>
@@ -885,15 +897,15 @@
     <string name="settings_youtube_login_success">YouTube login successful</string>
     <string name="settings_bili_status_valid">Saved and last refreshed %1$s</string>
     <string name="settings_bili_status_saved_invalid">A saved Cookie was found, but it may be invalid. Tap to refresh it or sign out</string>
-    <string name="settings_bili_status_missing">No usable Cookie detected. Tap to sign in again or import one</string>
+    <string name="settings_bili_status_missing">No usable Cookie detected. Tap to sign in</string>
     <string name="settings_netease_status_valid">Saved and last refreshed %1$s</string>
     <string name="settings_netease_status_saved_invalid">A saved Cookie was found, but it may be invalid. Tap to refresh it or sign out</string>
-    <string name="settings_netease_status_missing">No usable Cookie detected. Tap to sign in again or import one</string>
+    <string name="settings_netease_status_missing">No usable Cookie detected. Tap to sign in</string>
     <string name="settings_youtube_login_methods">Browser/Cookie Import</string>
     <string name="settings_youtube_auth_missing">No usable YouTube / YouTube Music auth information was captured</string>
     <string name="settings_youtube_status_valid">Saved and last refreshed %1$s</string>
     <string name="settings_youtube_status_saved_invalid">A saved Cookie was found, but it may be invalid. Tap to refresh it or sign out</string>
-    <string name="settings_youtube_status_missing">No usable Cookie detected. Tap to sign in again or import one</string>
+    <string name="settings_youtube_status_missing">No usable Cookie detected. Tap to sign in</string>
     <string name="settings_haptic_feedback">Haptic Feedback</string>
     <string name="settings_login_platforms">Third-party Sign-in</string>
     <string name="settings_login_platforms_expand">Select platform</string>
@@ -901,11 +913,8 @@
     <string name="settings_motion">Motion Settings</string>
     <string name="settings_motion_expand">Customize motion effects</string>
     <string name="settings_lyrics_offset">Lyrics Offset</string>
-    <string name="settings_lyrics_offset_expand">Adjust default lyric offsets per source</string>
-    <string name="settings_lyrics_offset_cloud_music">Cloud Music default offset</string>
-    <string name="settings_lyrics_offset_cloud_music_desc">Default offset applied when loading Cloud Music lyrics</string>
-    <string name="settings_lyrics_offset_qq_music">QQ Music default offset</string>
-    <string name="settings_lyrics_offset_qq_music_desc">Default offset applied when loading QQ Music lyrics</string>
+    <string name="settings_lyrics_offset_expand">Adjust the default lyric offset</string>
+    <string name="settings_lyrics_offset_default">Default lyric offset</string>
     <string name="settings_lyrics_offset_value">Current offset: %1$s ms</string>
 
     <!-- Now Playing / Empty State -->
@@ -1260,7 +1269,9 @@
     <string name="settings_netease_saved_cookie_title">Saved NetEase Cookie detected</string>
     <string name="settings_netease_saved_cookie_message">A local NetEase Cookie is already saved. You can sign out to clear it, or continue signing in to refresh the Cookie.</string>
     <string name="settings_saved_cookie_continue">Continue and refresh</string>
+    <string name="settings_saved_cookie_manage_source">Manage Source</string>
     <string name="settings_saved_cookie_logout">Sign out</string>
+    <string name="settings_saved_cookie_relogin">Sign in again</string>
     <string name="settings_youtube_login_browser_hint">Tries to open music.youtube.com in the built-in web view and automatically reads cookies after sign-in.</string>
     <string name="settings_youtube_saved_cookie_title">Saved YouTube Cookie detected</string>
     <string name="settings_youtube_saved_cookie_message">A local YouTube Cookie is already saved. You can sign out to clear it, or continue signing in to refresh the Cookie.</string>
@@ -1364,11 +1375,21 @@
     <string name="library_youtube_music_open_playlist">Open Playlist</string>
     <string name="library_youtube_music_copy_browse_id">Copy Browse ID</string>
     <string name="library_youtube_music_copy_playlist_id">Copy Playlist ID</string>
+    <string name="library_bili_folder_loading">Loading…</string>
+    <string name="library_bili_folder_load_failed">Load failed: %1$s</string>
+    <string name="library_bili_folder_empty">No videos found in this folder</string>
+    <string name="library_bili_collection">Video</string>
     <string name="library_platform_accounts">Platform Accounts</string>
     <string name="library_platform_accounts_desc">Connect platforms and the library will load playlists, favorites, and albums automatically</string>
     <string name="library_platform_login">Sign in</string>
     <string name="library_platform_manage">Manage</string>
-    <string name="library_platform_refresh_login">Refresh</string>
+    <string name="library_platform_refresh_login">Sign in again</string>
+    <string name="library_source_import_title">Manage %1$s</string>
+    <string name="library_source_import_empty">No importable playlists loaded yet</string>
+    <string name="library_source_import_apply">Save Selection (%1$d)</string>
+    <string name="library_source_import_updated">Imported playlists updated</string>
+    <string name="library_platform_import_playlists">%1$s Imported Playlists</string>
+    <string name="library_platform_manage_source_empty_hint">Manage sources to choose the playlists shown here</string>
     <string name="library_platform_connect_platform">Connect %1$s</string>
     <string name="library_platform_empty_netease_playlist">Sign in to load your NetEase playlists</string>
     <string name="library_platform_empty_netease_album">Sign in to load your saved NetEase albums</string>

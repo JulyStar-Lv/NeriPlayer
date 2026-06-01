@@ -48,6 +48,7 @@ import kotlinx.coroutines.CancellationException
 import moe.ouom.neriplayer.ui.screen.DownloadManagerScreen
 import moe.ouom.neriplayer.ui.screen.DownloadProgressScreen
 import moe.ouom.neriplayer.ui.screen.tab.SettingsScreen
+import moe.ouom.neriplayer.ui.screen.tab.settings.component.ThemeMode
 
 private enum class SettingsScreenState {
     Settings,
@@ -61,8 +62,9 @@ private fun SettingsScreenState.saveableKey(): String = "settings_host:${name}"
 fun SettingsHostScreen(
     dynamicColor: Boolean,
     onDynamicColorChange: (Boolean) -> Unit,
+    themeMode: ThemeMode,
     isDarkTheme: Boolean,
-    onThemeToggleRequest: (Offset, Float) -> Unit,
+    onThemeModeRequest: (ThemeMode, Offset, Float) -> Unit,
     preferredQuality: String,
     onQualityChange: (String) -> Unit,
     youtubePreferredQuality: String,
@@ -80,10 +82,8 @@ fun SettingsHostScreen(
     onLyricBlurEnabledChange: (Boolean) -> Unit,
     lyricBlurAmount: Float,
     onLyricBlurAmountChange: (Float) -> Unit,
-    cloudMusicLyricDefaultOffsetMs: Long,
-    onCloudMusicLyricDefaultOffsetMsChange: (Long) -> Unit,
-    qqMusicLyricDefaultOffsetMs: Long,
-    onQqMusicLyricDefaultOffsetMsChange: (Long) -> Unit,
+    lyricDefaultOffsetMs: Long,
+    onLyricDefaultOffsetMsChange: (Long) -> Unit,
     advancedLyricsEnabled: Boolean,
     onAdvancedLyricsEnabledChange: (Boolean) -> Unit,
     advancedBlurEnabled: Boolean,
@@ -120,6 +120,8 @@ fun SettingsHostScreen(
     onHapticFeedbackEnabledChange: (Boolean) -> Unit,
     showCoverSourceBadge: Boolean,
     onShowCoverSourceBadgeChange: (Boolean) -> Unit,
+    nowPlayingKeepScreenOn: Boolean,
+    onNowPlayingKeepScreenOnChange: (Boolean) -> Unit,
     showNowPlayingTitle: Boolean,
     onShowNowPlayingTitleChange: (Boolean) -> Unit,
     showNowPlayingProgressQualitySwitch: Boolean,
@@ -222,8 +224,9 @@ fun SettingsHostScreen(
                             listState = settingsListState,
                             dynamicColor = dynamicColor,
                             onDynamicColorChange = onDynamicColorChange,
+                            themeMode = themeMode,
                             isDarkTheme = isDarkTheme,
-                            onThemeToggleRequest = onThemeToggleRequest,
+                            onThemeModeRequest = onThemeModeRequest,
                             preferredQuality = preferredQuality,
                             onQualityChange = onQualityChange,
                             youtubePreferredQuality = youtubePreferredQuality,
@@ -241,10 +244,8 @@ fun SettingsHostScreen(
                             onLyricBlurEnabledChange = onLyricBlurEnabledChange,
                             lyricBlurAmount = lyricBlurAmount,
                             onLyricBlurAmountChange = onLyricBlurAmountChange,
-                            cloudMusicLyricDefaultOffsetMs = cloudMusicLyricDefaultOffsetMs,
-                            onCloudMusicLyricDefaultOffsetMsChange = onCloudMusicLyricDefaultOffsetMsChange,
-                            qqMusicLyricDefaultOffsetMs = qqMusicLyricDefaultOffsetMs,
-                            onQqMusicLyricDefaultOffsetMsChange = onQqMusicLyricDefaultOffsetMsChange,
+                            lyricDefaultOffsetMs = lyricDefaultOffsetMs,
+                            onLyricDefaultOffsetMsChange = onLyricDefaultOffsetMsChange,
                             advancedLyricsEnabled = advancedLyricsEnabled,
                             onAdvancedLyricsEnabledChange = onAdvancedLyricsEnabledChange,
                             advancedBlurEnabled = advancedBlurEnabled,
@@ -281,6 +282,8 @@ fun SettingsHostScreen(
                             onHapticFeedbackEnabledChange = onHapticFeedbackEnabledChange,
                             showCoverSourceBadge = showCoverSourceBadge,
                             onShowCoverSourceBadgeChange = onShowCoverSourceBadgeChange,
+                            nowPlayingKeepScreenOn = nowPlayingKeepScreenOn,
+                            onNowPlayingKeepScreenOnChange = onNowPlayingKeepScreenOnChange,
                             showNowPlayingTitle = showNowPlayingTitle,
                             onShowNowPlayingTitleChange = onShowNowPlayingTitleChange,
                             showNowPlayingProgressQualitySwitch = showNowPlayingProgressQualitySwitch,

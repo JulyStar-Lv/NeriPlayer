@@ -29,7 +29,9 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.MenuItem
+import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -39,13 +41,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.enableEdgeToEdge
-import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
-import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.snackbar.Snackbar
@@ -56,21 +52,22 @@ import moe.ouom.neriplayer.util.NPLogger
 import moe.ouom.neriplayer.util.hostMatchesAnyDomain
 import moe.ouom.neriplayer.util.isAllowedMainFrameRequest
 import moe.ouom.neriplayer.util.lockPortraitIfPhone
+import kotlin.math.roundToInt
 
 class NeteaseWebLoginActivity : ComponentActivity() {
 
     companion object {
         const val RESULT_COOKIE = "result_cookie_map_json"
-        private const val TARGET_URL = "https://music.163.com/"
+        private const val TARGET_URL = "https://y.music.163.com/m/login"
         private val ALLOWED_LOGIN_DOMAINS = setOf(
             "163.com",
             "126.net",
             "163yun.com"
         )
-        private const val DESKTOP_UA =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+        private const val MOBILE_UA =
+            "Mozilla/5.0 (Linux; Android 14; Pixel 7 Pro) " +
                     "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                    "Chrome/124.0.0.0 Safari/537.36"
+                    "Chrome/124.0.0.0 Mobile Safari/537.36"
     }
 
     private lateinit var webView: WebView
@@ -83,25 +80,28 @@ class NeteaseWebLoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lockPortraitIfPhone()
-        enableEdgeToEdge()
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
-        val root = CoordinatorLayout(this).apply {
+        val surfaceColor = MaterialColors.getColor(
+            window.decorView,
+            com.google.android.material.R.attr.cardBackgroundColor,
+            Color.WHITE
+        )
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             fitsSystemWindows = false
-            setBackgroundColor(
-                MaterialColors.getColor(
-                    this,
-                    com.google.android.material.R.attr.cardBackgroundColor,
-                    Color.WHITE
-                )
-            )
+            setBackgroundColor(surfaceColor)
         }
-
-        val appBar = AppBarLayout(this).apply {
-            layoutParams = CoordinatorLayout.LayoutParams(
+        toolbar = MaterialToolbar(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+            title = getString(R.string.netease_web_login)
+            setNavigationIcon(R.drawable.ic_arrow_back_24)
+            setNavigationOnClickListener { finish() }
+            inflateMenu(R.menu.menu_netease_web_login)
+            setOnMenuItemClickListener { onToolbarMenu(it) }
             setBackgroundColor(
                 MaterialColors.getColor(
                     this,
@@ -110,52 +110,32 @@ class NeteaseWebLoginActivity : ComponentActivity() {
                 )
             )
         }
-        toolbar = MaterialToolbar(this).apply {
-            title = getString(R.string.netease_web_login)
-            setNavigationIcon(R.drawable.ic_arrow_back_24)
-            setNavigationOnClickListener { finish() }
-            inflateMenu(R.menu.menu_netease_web_login)
-            setOnMenuItemClickListener { onToolbarMenu(it) }
-        }
-        appBar.addView(toolbar)
 
         webView = WebView(this).apply {
-            layoutParams = CoordinatorLayout.LayoutParams(
+            layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            ).apply {
-                behavior = AppBarLayout.ScrollingViewBehavior()
-            }
+                0,
+                1f
+            )
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 allowFileAccess = false
                 allowContentAccess = false
-                userAgentString = DESKTOP_UA
-                useWideViewPort = true
-                loadWithOverviewMode = true
-                setSupportZoom(true)
-                builtInZoomControls = true
+                userAgentString = MOBILE_UA
+                useWideViewPort = false
+                loadWithOverviewMode = false
+                setSupportZoom(false)
+                builtInZoomControls = false
                 displayZoomControls = false
             }
             webChromeClient = WebChromeClient()
             webViewClient = InnerClient()
         }
-
+        root.addView(toolbar)
         root.addView(webView)
-        root.addView(appBar)
-        appBar.bringToFront()
-
         setContentView(root)
-
-        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
-            val status = insets.getInsets(WindowInsetsCompat.Type.statusBars())
-            val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            appBar.updatePadding(top = status.top)
-            webView.updatePadding(bottom = nav.bottom)
-            insets
-        }
 
         onBackPressedDispatcher.addCallback(
             this,
@@ -307,7 +287,10 @@ class NeteaseWebLoginActivity : ComponentActivity() {
         if (resolvedUri.toString() == "about:blank") {
             return true
         }
-        if (!resolvedUri.scheme.equals("https", ignoreCase = true)) {
+        val scheme = resolvedUri.scheme.orEmpty()
+        if (!scheme.equals("https", ignoreCase = true) &&
+            !scheme.equals("http", ignoreCase = true)
+        ) {
             return false
         }
         return hostMatchesAnyDomain(resolvedUri.host, ALLOWED_LOGIN_DOMAINS)

@@ -28,42 +28,40 @@ package moe.ouom.neriplayer.ui.screen.tab.settings.auth
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.activity.BiliWebLoginActivity
 import moe.ouom.neriplayer.activity.YouTubeWebLoginActivity
 import moe.ouom.neriplayer.ui.component.bottomSheetDragBlocker
-import moe.ouom.neriplayer.ui.screen.tab.settings.component.InlineMessage
 import moe.ouom.neriplayer.ui.viewmodel.auth.BiliAuthViewModel
 import moe.ouom.neriplayer.ui.viewmodel.auth.YouTubeAuthViewModel
-import moe.ouom.neriplayer.util.HapticButton
-import moe.ouom.neriplayer.util.HapticTextButton
 
 @Composable
 internal fun SettingsBiliAuthDialogs(
@@ -80,18 +78,44 @@ internal fun SettingsBiliAuthDialogs(
     onDismissSavedCookieDialog: () -> Unit = {},
     onOpenSheetAtTab: (Int) -> Unit = {},
     onLogout: (() -> Unit)? = null,
-    onBrowserLogin: (() -> Unit)? = null
+    onBrowserLogin: (() -> Unit)? = null,
+    onManageSource: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val webLoginLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val json = result.data?.getStringExtra(BiliWebLoginActivity.RESULT_COOKIE) ?: "{}"
+            vm.importCookiesFromMap(vm.parseJsonToMap(json))
+        } else {
+            onInlineMsgChange(context.getString(R.string.settings_cookie_cancelled))
+        }
+    }
+    val launchBrowserLogin: () -> Unit = {
+        onInlineMsgChange(null)
+        val injectedBrowserLogin = onBrowserLogin
+        if (injectedBrowserLogin != null) {
+            injectedBrowserLogin()
+        } else {
+            webLoginLauncher.launch(Intent(context, BiliWebLoginActivity::class.java))
+        }
+    }
 
     if (showSavedCookieDialog) {
-        SavedCookieActionDialog(
-            title = stringResource(R.string.settings_bili_saved_cookie_title),
-            message = stringResource(R.string.settings_bili_saved_cookie_message),
+        SavedCookieActionSheet(
+            sourceName = stringResource(R.string.platform_bilibili),
+            sourceIconResId = R.drawable.ic_bilibili,
             onDismiss = onDismissSavedCookieDialog,
-            onContinueLogin = {
+            onManageSource = onManageSource?.let { manage ->
+                {
+                    onDismissSavedCookieDialog()
+                    manage()
+                }
+            },
+            onRelogin = {
                 onDismissSavedCookieDialog()
-                onOpenSheetAtTab(0)
+                launchBrowserLogin()
             },
             onLogout = {
                 onDismissSavedCookieDialog()
@@ -101,53 +125,10 @@ internal fun SettingsBiliAuthDialogs(
     }
 
     if (showSheet) {
-        val launchBrowserLogin: () -> Unit = onBrowserLogin?.let { injectedBrowserLogin ->
-            {
-                onInlineMsgChange(null)
-                injectedBrowserLogin()
-            }
-        } ?: run {
-            val webLoginLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.StartActivityForResult()
-            ) { result ->
-                if (result.resultCode == android.app.Activity.RESULT_OK) {
-                    val json = result.data?.getStringExtra(BiliWebLoginActivity.RESULT_COOKIE) ?: "{}"
-                    vm.importCookiesFromMap(vm.parseJsonToMap(json))
-                } else {
-                    onInlineMsgChange(context.getString(R.string.settings_cookie_cancelled))
-                }
-            }
-            val defaultBrowserLogin: () -> Unit = {
-                onInlineMsgChange(null)
-                webLoginLauncher.launch(Intent(context, BiliWebLoginActivity::class.java))
-            }
-            defaultBrowserLogin
+        LaunchedEffect(showSheet) {
+            launchBrowserLogin()
+            onDismissSheet()
         }
-
-        TwoTabCookieLoginSheet(
-            title = stringResource(R.string.platform_bilibili),
-            initialTab = initialTab,
-            inlineMsg = inlineMsg,
-            onInlineMsgChange = onInlineMsgChange,
-            onDismiss = onDismissSheet,
-            browserHintContent = {
-                Text(
-                    stringResource(R.string.settings_bili_login_browser_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-            },
-            cookieLabel = stringResource(R.string.login_paste_bili_cookie_hint),
-            onBrowserLogin = launchBrowserLogin,
-            onSaveCookie = { rawCookie ->
-                if (rawCookie.isBlank()) {
-                    onInlineMsgChange(context.getString(R.string.auth_cookie_empty))
-                } else {
-                    vm.importCookiesFromRaw(rawCookie)
-                }
-            }
-        )
     }
 
     if (showCookieDialog) {
@@ -174,18 +155,44 @@ internal fun SettingsYouTubeAuthDialogs(
     onDismissSavedCookieDialog: () -> Unit = {},
     onOpenSheetAtTab: (Int) -> Unit = {},
     onLogout: (() -> Unit)? = null,
-    onBrowserLogin: (() -> Unit)? = null
+    onBrowserLogin: (() -> Unit)? = null,
+    onManageSource: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val webLoginLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val json = result.data?.getStringExtra(YouTubeWebLoginActivity.RESULT_AUTH_JSON) ?: "{}"
+            vm.importAuthFromJson(json)
+        } else {
+            onInlineMsgChange(context.getString(R.string.settings_cookie_cancelled))
+        }
+    }
+    val launchBrowserLogin: () -> Unit = {
+        onInlineMsgChange(null)
+        val injectedBrowserLogin = onBrowserLogin
+        if (injectedBrowserLogin != null) {
+            injectedBrowserLogin()
+        } else {
+            webLoginLauncher.launch(Intent(context, YouTubeWebLoginActivity::class.java))
+        }
+    }
 
     if (showSavedCookieDialog) {
-        SavedCookieActionDialog(
-            title = stringResource(R.string.settings_youtube_saved_cookie_title),
-            message = stringResource(R.string.settings_youtube_saved_cookie_message),
+        SavedCookieActionSheet(
+            sourceName = stringResource(R.string.common_youtube),
+            sourceIconResId = R.drawable.ic_youtube,
             onDismiss = onDismissSavedCookieDialog,
-            onContinueLogin = {
+            onManageSource = onManageSource?.let { manage ->
+                {
+                    onDismissSavedCookieDialog()
+                    manage()
+                }
+            },
+            onRelogin = {
                 onDismissSavedCookieDialog()
-                onOpenSheetAtTab(0)
+                launchBrowserLogin()
             },
             onLogout = {
                 onDismissSavedCookieDialog()
@@ -195,59 +202,10 @@ internal fun SettingsYouTubeAuthDialogs(
     }
 
     if (showSheet) {
-        val launchBrowserLogin: () -> Unit = onBrowserLogin?.let { injectedBrowserLogin ->
-            {
-                onInlineMsgChange(null)
-                injectedBrowserLogin()
-            }
-        } ?: run {
-            val webLoginLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.StartActivityForResult()
-            ) { result ->
-                if (result.resultCode == android.app.Activity.RESULT_OK) {
-                    val json = result.data?.getStringExtra(YouTubeWebLoginActivity.RESULT_AUTH_JSON) ?: "{}"
-                    vm.importAuthFromJson(json)
-                } else {
-                    onInlineMsgChange(context.getString(R.string.settings_cookie_cancelled))
-                }
-            }
-            val defaultBrowserLogin: () -> Unit = {
-                onInlineMsgChange(null)
-                webLoginLauncher.launch(Intent(context, YouTubeWebLoginActivity::class.java))
-            }
-            defaultBrowserLogin
+        LaunchedEffect(showSheet) {
+            launchBrowserLogin()
+            onDismissSheet()
         }
-
-        TwoTabCookieLoginSheet(
-            title = stringResource(R.string.common_youtube),
-            initialTab = initialTab,
-            inlineMsg = inlineMsg,
-            onInlineMsgChange = onInlineMsgChange,
-            onDismiss = onDismissSheet,
-            browserHintContent = {
-                Text(
-                    stringResource(R.string.settings_youtube_login_browser_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.settings_youtube_login_browser_warning),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-            },
-            cookieLabel = stringResource(R.string.login_paste_youtube_cookie_hint),
-            onBrowserLogin = launchBrowserLogin,
-            onSaveCookie = { rawCookie ->
-                if (rawCookie.isBlank()) {
-                    onInlineMsgChange(context.getString(R.string.auth_cookie_empty))
-                } else {
-                    vm.importCookiesFromRaw(rawCookie)
-                }
-            }
-        )
     }
 
     if (showCookieDialog) {
@@ -260,20 +218,15 @@ internal fun SettingsYouTubeAuthDialogs(
 }
 
 @Composable
-private fun TwoTabCookieLoginSheet(
-    title: String,
-    initialTab: Int,
-    inlineMsg: String?,
-    onInlineMsgChange: (String?) -> Unit,
+internal fun SavedCookieActionSheet(
+    sourceName: String,
+    sourceIconResId: Int,
     onDismiss: () -> Unit,
-    browserHintContent: @Composable ColumnScope.() -> Unit,
-    cookieLabel: String,
-    onBrowserLogin: () -> Unit,
-    onSaveCookie: (String) -> Unit
+    onManageSource: (() -> Unit)?,
+    onRelogin: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
-    var rawCookie by remember { mutableStateOf("") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -281,86 +234,57 @@ private fun TwoTabCookieLoginSheet(
         sheetGesturesEnabled = false,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .bottomSheetDragBlocker()
                 .padding(start = 16.dp, end = 16.dp, bottom = 48.dp, top = 12.dp)
         ) {
-            Column {
-                Text(title, style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                AnimatedVisibility(visible = inlineMsg != null, enter = fadeIn(), exit = fadeOut()) {
-                    InlineMessage(
-                        text = inlineMsg ?: "",
-                        onClose = { onInlineMsgChange(null) }
-                    )
-                }
-
-                PrimaryTabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(R.string.login_browser)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.login_paste_cookie)) }
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                when (selectedTab) {
-                    0 -> {
-                        browserHintContent()
-                        HapticButton(onClick = onBrowserLogin) {
-                            Text(stringResource(R.string.login_start_browser))
-                        }
-                    }
-
-                    else -> {
-                        androidx.compose.material3.OutlinedTextField(
-                            value = rawCookie,
-                            onValueChange = { rawCookie = it },
-                            label = { Text(cookieLabel) },
-                            minLines = 6,
-                            maxLines = 10,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        HapticButton(onClick = { onSaveCookie(rawCookie) }) {
-                            Text(stringResource(R.string.login_save_cookie))
-                        }
-                    }
-                }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = sourceIconResId),
+                    contentDescription = sourceName,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(sourceName, style = MaterialTheme.typography.titleLarge)
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            if (onManageSource != null) {
+                SavedCookieActionItem(
+                    text = stringResource(R.string.settings_saved_cookie_manage_source),
+                    onClick = onManageSource
+                )
+            }
+            SavedCookieActionItem(
+                text = stringResource(R.string.settings_saved_cookie_relogin),
+                onClick = onRelogin
+            )
+            SavedCookieActionItem(
+                text = stringResource(R.string.settings_saved_cookie_logout),
+                onClick = onLogout
+            )
         }
     }
 }
 
 @Composable
-internal fun SavedCookieActionDialog(
-    title: String,
-    message: String,
-    onDismiss: () -> Unit,
-    onContinueLogin: () -> Unit,
-    onLogout: () -> Unit
+private fun SavedCookieActionItem(
+    text: String,
+    onClick: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(message) },
-        confirmButton = {
-            HapticTextButton(onClick = onContinueLogin) {
-                Text(stringResource(R.string.settings_saved_cookie_continue))
-            }
-        },
-        dismissButton = {
-            HapticTextButton(onClick = onLogout) {
-                Text(stringResource(R.string.settings_saved_cookie_logout))
-            }
-        }
+    ListItem(
+        headlineContent = { Text(text) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }

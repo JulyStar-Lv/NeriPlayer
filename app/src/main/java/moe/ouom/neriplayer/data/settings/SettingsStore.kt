@@ -38,6 +38,7 @@ object SettingsKeys {
     val FORCE_DARK = booleanPreferencesKey("force_dark")
     val FOLLOW_SYSTEM_DARK = booleanPreferencesKey("follow_system_dark")
     val SHOW_COVER_SOURCE_BADGE = booleanPreferencesKey("show_cover_source_badge")
+    val NOWPLAYING_KEEP_SCREEN_ON = booleanPreferencesKey("nowplaying_keep_screen_on")
     val NOWPLAYING_SHOW_TITLE = booleanPreferencesKey("nowplaying_show_title")
     val NOWPLAYING_PROGRESS_SHOW_QUALITY_SWITCH =
         booleanPreferencesKey("nowplaying_progress_show_quality_switch")
@@ -58,10 +59,7 @@ object SettingsKeys {
     val THEME_COLOR_PALETTE = stringPreferencesKey("theme_color_palette_v2")
     val LYRIC_BLUR_ENABLED = booleanPreferencesKey("lyric_blur_enabled")
     val LYRIC_BLUR_AMOUNT = floatPreferencesKey("lyric_blur_amount")
-    val CLOUD_MUSIC_LYRIC_DEFAULT_OFFSET_MS =
-        longPreferencesKey("cloud_music_lyric_default_offset_ms")
-    val QQ_MUSIC_LYRIC_DEFAULT_OFFSET_MS =
-        longPreferencesKey("qq_music_lyric_default_offset_ms")
+    val LYRIC_DEFAULT_OFFSET_MS = longPreferencesKey("lyric_default_offset_ms")
     val ADVANCED_LYRICS_ENABLED = booleanPreferencesKey("advanced_lyrics_enabled")
     val ADVANCED_BLUR_ENABLED = booleanPreferencesKey("advanced_blur_enabled")
     val NOWPLAYING_AUDIO_REACTIVE_ENABLED = booleanPreferencesKey("nowplaying_audio_reactive_enabled")

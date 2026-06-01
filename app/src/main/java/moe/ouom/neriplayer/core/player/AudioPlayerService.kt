@@ -23,6 +23,7 @@ package moe.ouom.neriplayer.core.player
  * Updated: 2026/3/23
  */
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.app.Notification
@@ -58,6 +59,7 @@ import androidx.media.session.MediaButtonReceiver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import coil.request.ImageRequest
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -216,6 +218,7 @@ internal fun shouldSkipFullSyncForLocalPlaybackAction(
     return foregroundStarted && hasItems && hasCurrentSong
 }
 
+@SuppressLint("ObsoleteSdkInt")
 private fun Context.findActivityReadyForDirectServiceStart(): Activity? {
     var current: Context? = this
     while (current is ContextWrapper) {
@@ -331,7 +334,11 @@ class AudioPlayerService : Service() {
 
     private var currentCoverSource: String? = null
     private var currentLargeIcon: Bitmap? = null
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val serviceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, throwable ->
+            NPLogger.e("NERI-AudioService", "Uncaught coroutine exception in serviceScope", throwable)
+        }
+    )
     private val mediaSessionPlaybackStateThrottler = MediaSessionPlaybackStateThrottler()
     private var allowServiceRestart = true
     private var hasReceivedStartCommand = false
@@ -977,7 +984,7 @@ class AudioPlayerService : Service() {
         val scheme = parsed?.scheme?.lowercase()
         return when {
             scheme.isNullOrBlank() -> filePathToUriString(raw)
-            scheme == "file" -> parsed?.path?.let(::filePathToUriString) ?: raw
+            scheme == "file" -> parsed.path?.let(::filePathToUriString) ?: raw
             else -> raw
         }
     }
@@ -995,6 +1002,7 @@ class AudioPlayerService : Service() {
         )
         // 从最近任务移除时不再直接停播，只禁止这次会话后续自动恢复
         if (PlayerManager.hasItems()) {
+            PlayerManager.flushPlaybackStatsBlocking("task_removed")
             PlayerManager.suppressFutureAutoResumeForCurrentSession(forcePersist = true)
             updateNotification()
         }
@@ -1009,6 +1017,7 @@ class AudioPlayerService : Service() {
         )
         isServiceForegroundActive = false
         isServiceInstanceActive = false
+        PlayerManager.flushPlaybackStatsBlocking("service_destroy")
         unregisterReceiver(becomingNoisyReceiver)
         serviceScope.cancel()
         mediaSession.isActive = false
@@ -1025,6 +1034,9 @@ class AudioPlayerService : Service() {
             "NERI-APS",
             "onTrimMemory level=$level ${buildStateSummary()}"
         )
+        if (level >= TRIM_MEMORY_UI_HIDDEN && PlayerManager.hasItems()) {
+            PlayerManager.flushPlaybackStatsBlocking("service_trim_memory_$level")
+        }
     }
 
     override fun onLowMemory() {
@@ -1033,6 +1045,9 @@ class AudioPlayerService : Service() {
             "NERI-APS",
             "onLowMemory ${buildStateSummary()}"
         )
+        if (PlayerManager.hasItems()) {
+            PlayerManager.flushPlaybackStatsBlocking("service_low_memory")
+        }
     }
 
 
@@ -1095,7 +1110,7 @@ class AudioPlayerService : Service() {
         boxDp: Int = 24,
         glyphDp: Int = 18
     ): IconCompat {
-        val d = AppCompatResources.getDrawable(this, resId)!!.mutate()
+        val d = (AppCompatResources.getDrawable(this, resId) ?: return IconCompat.createWithResource(this, resId)).mutate()
         DrawableCompat.setTintList(d, null)
 
         fun dp2px(dp: Int) = TypedValue.applyDimension(

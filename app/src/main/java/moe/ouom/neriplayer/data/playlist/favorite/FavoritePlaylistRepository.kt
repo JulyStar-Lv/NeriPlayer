@@ -49,6 +49,9 @@ data class FavoritePlaylist(
     val browseId: String? = null,
     val playlistId: String? = null,
     val subtitle: String? = null,
+    val fid: Long? = null,
+    val mid: Long? = null,
+    val bvid: String? = null,
     val songs: List<SongItem>,
     val addedTime: Long = System.currentTimeMillis(),
     val sortOrder: Long = addedTime,
@@ -145,6 +148,9 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
         browseId: String? = null,
         playlistId: String? = null,
         subtitle: String? = null,
+        fid: Long? = null,
+        mid: Long? = null,
+        bvid: String? = null,
         songs: List<SongItem>
     ) {
         withContext(Dispatchers.IO) {
@@ -167,6 +173,9 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
                 browseId = browseId?.takeIf { it.isNotBlank() } ?: existing?.browseId,
                 playlistId = playlistId?.takeIf { it.isNotBlank() } ?: existing?.playlistId,
                 subtitle = subtitle?.takeIf { it.isNotBlank() } ?: existing?.subtitle,
+                fid = fid ?: existing?.fid,
+                mid = mid ?: existing?.mid,
+                bvid = bvid?.takeIf { it.isNotBlank() } ?: existing?.bvid,
                 songs = mergedSongs.ifEmpty { existing?.songs.orEmpty() },
                 addedTime = existing?.takeUnless { it.isDeleted }?.addedTime ?: now,
                 sortOrder = existing?.takeUnless { it.isDeleted }?.normalizeSortOrder()?.sortOrder ?: now,
@@ -221,6 +230,9 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
         browseId: String? = null,
         playlistId: String? = null,
         subtitle: String? = null,
+        fid: Long? = null,
+        mid: Long? = null,
+        bvid: String? = null,
         songs: List<SongItem>
     ) {
         withContext(Dispatchers.IO) {
@@ -243,6 +255,9 @@ class FavoritePlaylistRepository private constructor(private val context: Contex
                 browseId = browseId?.takeIf { it.isNotBlank() } ?: existing.browseId,
                 playlistId = playlistId?.takeIf { it.isNotBlank() } ?: existing.playlistId,
                 subtitle = subtitle?.takeIf { it.isNotBlank() } ?: existing.subtitle,
+                fid = fid ?: existing.fid,
+                mid = mid ?: existing.mid,
+                bvid = bvid?.takeIf { it.isNotBlank() } ?: existing.bvid,
                 songs = mergedSongs,
                 sortOrder = existing.normalizeSortOrder().sortOrder,
                 modifiedAt = System.currentTimeMillis(),

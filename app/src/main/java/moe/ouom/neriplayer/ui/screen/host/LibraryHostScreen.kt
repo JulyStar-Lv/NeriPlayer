@@ -58,6 +58,7 @@ import moe.ouom.neriplayer.ui.viewmodel.tab.AlbumSummary
 import moe.ouom.neriplayer.ui.viewmodel.tab.PlaylistSummary
 import moe.ouom.neriplayer.ui.viewmodel.tab.BiliPlaylist
 import moe.ouom.neriplayer.ui.viewmodel.tab.YouTubeMusicPlaylist
+import moe.ouom.neriplayer.ui.viewmodel.playlist.BiliVideoItem
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 import moe.ouom.neriplayer.core.api.bili.BiliClient
 import moe.ouom.neriplayer.core.di.AppContainer
@@ -87,6 +88,9 @@ sealed class LibrarySelectedItem : Parcelable {
 @Composable
 fun LibraryHostScreen(
     onSongClick: (List<SongItem>, Int) -> Unit = { _, _ -> },
+    onPlayBiliAudio: (List<BiliVideoItem>, Int) -> Unit = { videos, index ->
+        PlayerManager.playBiliVideoAsAudio(videos, index)
+    },
     onPlayParts: (BiliClient.VideoBasicInfo, Int, String) -> Unit = { _, _, _ -> },
     onOpenRecent: () -> Unit = {},
     onOpenStats: () -> Unit = {}
@@ -251,9 +255,7 @@ fun LibraryHostScreen(
                         BiliPlaylistDetailScreen(
                             playlist = current.playlist,
                             onBack = { selected = null },
-                            onPlayAudio = { videos, index ->
-                                PlayerManager.playBiliVideoAsAudio(videos, index)
-                            },
+                            onPlayAudio = onPlayBiliAudio,
                             onPlayParts = onPlayParts
                         )
                     }

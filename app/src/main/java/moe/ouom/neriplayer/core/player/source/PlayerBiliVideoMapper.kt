@@ -28,13 +28,17 @@ import moe.ouom.neriplayer.ui.viewmodel.playlist.BiliVideoItem
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 
 internal fun BiliVideoItem.toSongItem(): SongItem {
+    val hasPart = cid > 0L
     return SongItem(
         id = id,
         name = title,
         artist = uploader,
-        album = PlayerManager.BILI_SOURCE_TAG,
+        album = if (hasPart) "${PlayerManager.BILI_SOURCE_TAG}|$cid" else PlayerManager.BILI_SOURCE_TAG,
         albumId = 0,
         durationMs = durationSec * 1000L,
-        coverUrl = coverUrl
+        coverUrl = coverUrl,
+        channelId = "bilibili",
+        audioId = id.toString(),
+        subAudioId = cid.takeIf { hasPart }?.toString()
     )
 }

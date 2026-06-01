@@ -39,6 +39,7 @@ import moe.ouom.neriplayer.ui.viewmodel.youtube.YouTubeMusicTrack
 import moe.ouom.neriplayer.ui.viewmodel.youtube.YouTubeMusicUiDependencies
 import moe.ouom.neriplayer.util.ExceptionHandler
 import moe.ouom.neriplayer.util.LanguageManager
+import moe.ouom.neriplayer.widget.PlayerWidgetUpdater
 
 class NeriPlayerApplication : Application() {
     override fun onCreate() {
@@ -108,5 +109,7 @@ class NeriPlayerApplication : Application() {
             }
             .build()
         Coil.setImageLoader(imageLoader)
+
+        PlayerWidgetUpdater.start(this)
     }
 }

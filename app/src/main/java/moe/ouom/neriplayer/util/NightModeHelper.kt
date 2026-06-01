@@ -28,7 +28,7 @@ import androidx.appcompat.app.AppCompatDelegate
 object NightModeHelper {
 
     /**
-     * 优先级：forceDark > followSystem > 强制浅色
+     * 优先级：followSystem > forceDark > 强制浅色
      * 调用后会触发 Activity 重建，资源/Compose/UI一致更新
      */
     fun applyNightMode(
@@ -36,8 +36,8 @@ object NightModeHelper {
         forceDark: Boolean
     ) {
         val mode = when {
-            forceDark -> AppCompatDelegate.MODE_NIGHT_YES
             followSystemDark -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            forceDark -> AppCompatDelegate.MODE_NIGHT_YES
             else -> AppCompatDelegate.MODE_NIGHT_NO
         }
         AppCompatDelegate.setDefaultNightMode(mode)

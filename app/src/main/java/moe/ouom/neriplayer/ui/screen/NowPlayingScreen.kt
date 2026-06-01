@@ -229,8 +229,7 @@ import moe.ouom.neriplayer.data.model.sameIdentityAs
 import moe.ouom.neriplayer.data.model.stableKey
 import moe.ouom.neriplayer.data.platform.youtube.extractYouTubeMusicVideoId
 import moe.ouom.neriplayer.data.platform.youtube.isYouTubeMusicSong
-import moe.ouom.neriplayer.data.settings.DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS
-import moe.ouom.neriplayer.data.settings.DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS
+import moe.ouom.neriplayer.data.settings.DEFAULT_LYRIC_DEFAULT_OFFSET_MS
 import moe.ouom.neriplayer.data.settings.LYRIC_DEFAULT_OFFSET_STEP_MS
 import moe.ouom.neriplayer.data.settings.MAX_LYRIC_DEFAULT_OFFSET_MS
 import moe.ouom.neriplayer.data.settings.MAX_LYRIC_FONT_SCALE
@@ -278,6 +277,7 @@ private const val LyricsPageTransitionDurationMs = 300
 private const val CoverSourceBadgeRevealBufferMs = 120
 private const val CoverSourceBadgeRevealDelayMs =
     LyricsPageTransitionDurationMs + CoverSourceBadgeRevealBufferMs
+private const val NowPlayingPortraitContentWidthFraction = 0.97f
 private val LyricOffsetStepMsFloat = LYRIC_DEFAULT_OFFSET_STEP_MS.toFloat()
 
 internal fun shouldHideDownloadActionForSong(
@@ -375,12 +375,9 @@ fun NowPlayingScreen(
     val showProgressAudioSpec by settingsRepo
         .nowPlayingProgressShowAudioSpecFlow
         .collectAsState(initial = true)
-    val cloudMusicLyricDefaultOffsetMs by settingsRepo
-        .cloudMusicLyricDefaultOffsetMsFlow
-        .collectAsState(initial = DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS)
-    val qqMusicLyricDefaultOffsetMs by settingsRepo
-        .qqMusicLyricDefaultOffsetMsFlow
-        .collectAsState(initial = DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS)
+    val lyricDefaultOffsetMs by settingsRepo
+        .lyricDefaultOffsetMsFlow
+        .collectAsState(initial = DEFAULT_LYRIC_DEFAULT_OFFSET_MS)
 
     // 订阅当前播放链接
     val currentMediaUrl by PlayerManager.currentMediaUrlFlow.collectAsState()
@@ -691,8 +688,8 @@ fun NowPlayingScreen(
     // 歌词偏移（平台 + 用户自定义）
     val platformOffset = resolveLyricDefaultOffsetMs(
         lyricSource = currentSong?.matchedLyricSource,
-        cloudMusicDefaultOffsetMs = cloudMusicLyricDefaultOffsetMs,
-        qqMusicDefaultOffsetMs = qqMusicLyricDefaultOffsetMs
+        cloudMusicDefaultOffsetMs = lyricDefaultOffsetMs,
+        qqMusicDefaultOffsetMs = lyricDefaultOffsetMs
     )
     val userOffset = currentSong?.userLyricOffsetMs ?: 0L
     val totalOffset = platformOffset + userOffset
@@ -755,6 +752,11 @@ fun NowPlayingScreen(
                 // 播放页面
                 val horizontalPadding = if (isLandscape) 16.dp else 20.dp
                 val verticalPadding = if (isLandscape) 8.dp else 12.dp
+                val primaryContentWidthFraction = if (useWideLandscapeLayout) {
+                    0.88f
+                } else {
+                    NowPlayingPortraitContentWidthFraction
+                }
                 var contentModifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.statusBars)
@@ -825,7 +827,10 @@ fun NowPlayingScreen(
                             )
                             isLandscape -> minOf(windowWidthDp * 0.45f, maxHeight * 0.5f, maxWidth)
                             else -> {
-                                minOf(maxWidth * 0.97f, maxHeight * 0.78f)
+                                minOf(
+                                    maxWidth * NowPlayingPortraitContentWidthFraction,
+                                    maxHeight * 0.78f
+                                )
                             }
                         }
                         val coverSize by animateDpAsState(
@@ -967,7 +972,7 @@ fun NowPlayingScreen(
                         visible = contentVisible,
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
-                            .fillMaxWidth(if (useWideLandscapeLayout) 0.88f else 1f),
+                            .fillMaxWidth(primaryContentWidthFraction),
                         enter = slideInVertically(
                             animationSpec = tween(durationMillis = 400, delayMillis = 150),
                             initialOffsetY = { it / 4 }
@@ -1150,7 +1155,7 @@ fun NowPlayingScreen(
                         useWideLandscapeLayout = useWideLandscapeLayout,
                         onPreviewPositionChange = { previewPositionOverrideMs = it },
                         modifier = Modifier
-                            .fillMaxWidth(if (useWideLandscapeLayout) 0.88f else 1f)
+                            .fillMaxWidth(primaryContentWidthFraction)
                             .sharedBounds(
                                 rememberSharedContentState(key = "progress_bar"),
                                 animatedVisibilityScope = this@AnimatedContent
@@ -2735,6 +2740,7 @@ fun EditSongInfoSheet(
         ) {
             HapticTextButton(
                 onClick = {
+                    viewModel.prepareForSearch(songName)
                     viewModel.performSearch()
                     showSearchResults = true
                     focusManager.clearFocus()
@@ -2925,6 +2931,33 @@ fun EditSongInfoSheet(
                         Text(stringResource(R.string.action_cancel))
                     }
                 }
+
+                OutlinedTextField(
+                    value = searchState.keyword,
+                    onValueChange = { viewModel.onKeywordChange(it) },
+                    label = { Text(stringResource(R.string.music_auto_fill_custom_title)) },
+                    placeholder = {
+                        Text(stringResource(R.string.music_auto_fill_custom_title_hint))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    trailingIcon = {
+                        HapticIconButton(onClick = {
+                            viewModel.performSearch()
+                            focusManager.clearFocus()
+                        }) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = stringResource(R.string.cd_search)
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        viewModel.performSearch()
+                        focusManager.clearFocus()
+                    })
+                )
 
                 // 平台切换
                 androidx.compose.material3.PrimaryTabRow(

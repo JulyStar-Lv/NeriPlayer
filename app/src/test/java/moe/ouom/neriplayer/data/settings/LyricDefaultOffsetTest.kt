@@ -23,20 +23,23 @@ class LyricDefaultOffsetTest {
 
     @Test
     fun resolveLyricDefaultOffsetMs_prefersQqSettingForQqLyrics() {
+        val cloudMusicDefaultOffsetMs = 500L
+        val qqMusicDefaultOffsetMs = 700L
+
         assertEquals(
-            DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS,
+            qqMusicDefaultOffsetMs,
             resolveLyricDefaultOffsetMs(
                 lyricSource = MusicPlatform.QQ_MUSIC,
-                cloudMusicDefaultOffsetMs = DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS,
-                qqMusicDefaultOffsetMs = DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS
+                cloudMusicDefaultOffsetMs = cloudMusicDefaultOffsetMs,
+                qqMusicDefaultOffsetMs = qqMusicDefaultOffsetMs
             )
         )
         assertEquals(
-            DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS,
+            cloudMusicDefaultOffsetMs,
             resolveLyricDefaultOffsetMs(
                 lyricSource = MusicPlatform.CLOUD_MUSIC,
-                cloudMusicDefaultOffsetMs = DEFAULT_CLOUD_MUSIC_LYRIC_OFFSET_MS,
-                qqMusicDefaultOffsetMs = DEFAULT_QQ_MUSIC_LYRIC_OFFSET_MS
+                cloudMusicDefaultOffsetMs = cloudMusicDefaultOffsetMs,
+                qqMusicDefaultOffsetMs = qqMusicDefaultOffsetMs
             )
         )
     }

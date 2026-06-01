@@ -26,6 +26,19 @@ package moe.ouom.neriplayer.ui.viewmodel.tab
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
+const val BILI_COLLECTION_FID: Long = -21L
+const val BILI_SINGLE_VIDEO_FID: Long = -2L
+private val BILI_HI_RES_TITLE_MARKERS = listOf(
+    "【Hi-Res无损音乐】",
+    "【Hi-Res无损音质】"
+)
+
+fun normalizeBiliPlaylistTitle(title: String): String {
+    return BILI_HI_RES_TITLE_MARKERS.fold(title) { normalized, marker ->
+        normalized.replace(marker, "")
+    }.trim()
+}
+
 /**
  * 通用歌单摘要模型
  * 当前主要承载网易云歌单卡片数据，但字段本身不绑定具体平台
@@ -59,5 +72,6 @@ data class BiliPlaylist(
     val mid: Long,
     val title: String,
     val count: Int,
-    val coverUrl: String
+    val coverUrl: String,
+    val bvid: String = ""
 ) : Parcelable

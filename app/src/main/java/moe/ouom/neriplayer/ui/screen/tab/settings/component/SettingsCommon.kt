@@ -47,6 +47,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
@@ -80,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.toColorInt
 import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.util.HapticIconButton
+import kotlin.math.abs
 
 internal fun maskCookieValue(value: String): String {
     return when {
@@ -89,6 +91,31 @@ internal fun maskCookieValue(value: String): String {
 }
 
 private val SettingsItemShape = RoundedCornerShape(18.dp)
+
+enum class ThemeMode {
+    Auto,
+    Light,
+    Dark
+}
+
+fun resolveThemeMode(
+    followSystemDark: Boolean,
+    forceDark: Boolean
+): ThemeMode {
+    return when {
+        followSystemDark -> ThemeMode.Auto
+        forceDark -> ThemeMode.Dark
+        else -> ThemeMode.Light
+    }
+}
+
+internal fun ThemeMode.next(): ThemeMode {
+    return when (this) {
+        ThemeMode.Auto -> ThemeMode.Light
+        ThemeMode.Light -> ThemeMode.Dark
+        ThemeMode.Dark -> ThemeMode.Auto
+    }
+}
 
 internal fun Modifier.settingsItemClickable(
     enabled: Boolean = true,
@@ -215,27 +242,51 @@ internal fun ThemeModeActionButton(
     isDarkTheme: Boolean,
     onToggleRequest: (Offset, Float) -> Unit
 ) {
+    ThemeModeActionButton(
+        themeMode = if (isDarkTheme) ThemeMode.Dark else ThemeMode.Light,
+        isDarkTheme = isDarkTheme,
+        onModeRequest = { _, originInWindow, startRadiusPx ->
+            onToggleRequest(originInWindow, startRadiusPx)
+        }
+    )
+}
+
+@Composable
+internal fun ThemeModeActionButton(
+    themeMode: ThemeMode,
+    isDarkTheme: Boolean,
+    onModeRequest: (ThemeMode, Offset, Float) -> Unit
+) {
     var centerInWindow by remember { mutableStateOf<Offset?>(null) }
     var revealStartRadiusPx by remember { mutableFloatStateOf(18f) }
-    val contentDescription = if (isDarkTheme) {
-        stringResource(R.string.settings_theme_toggle_light)
-    } else {
-        stringResource(R.string.settings_theme_toggle_dark)
+    val nextThemeMode = themeMode.next()
+    val contentDescription = when (nextThemeMode) {
+        ThemeMode.Auto -> stringResource(R.string.settings_theme_toggle_auto)
+        ThemeMode.Light -> stringResource(R.string.settings_theme_toggle_light)
+        ThemeMode.Dark -> stringResource(R.string.settings_theme_toggle_dark)
     }
     val iconProgress by animateFloatAsState(
-        targetValue = if (isDarkTheme) 1f else 0f,
+        targetValue = when (themeMode) {
+            ThemeMode.Light -> 0f
+            ThemeMode.Dark -> 1f
+            ThemeMode.Auto -> 2f
+        },
         animationSpec = tween(durationMillis = 620, easing = FastOutSlowInEasing),
         label = "theme_toggle_icon_progress"
     )
     val containerColor by animateColorAsState(
-        targetValue = if (isDarkTheme) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+        targetValue = when (themeMode) {
+            ThemeMode.Auto -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+            ThemeMode.Dark -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
+            ThemeMode.Light -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
         },
         animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
         label = "theme_toggle_container_color"
     )
+
+    fun iconAlpha(target: Float): Float {
+        return (1f - abs(iconProgress - target)).coerceIn(0f, 1f)
+    }
 
     Box(
         modifier = Modifier
@@ -244,7 +295,11 @@ internal fun ThemeModeActionButton(
             .background(containerColor)
     ) {
         HapticIconButton(
-            onClick = { centerInWindow?.let { onToggleRequest(it, revealStartRadiusPx) } },
+            onClick = {
+                centerInWindow?.let {
+                    onModeRequest(nextThemeMode, it, revealStartRadiusPx)
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .onGloballyPositioned { coordinates ->
@@ -260,31 +315,45 @@ internal fun ThemeModeActionButton(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.DarkMode,
-                    contentDescription = contentDescription,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .graphicsLayer {
-                            alpha = 1f - iconProgress
-                            val scale = 0.56f + (1f - iconProgress) * 0.44f
-                            scaleX = scale
-                            scaleY = scale
-                            rotationZ = -56f * iconProgress
-                        }
-                )
-                Icon(
                     imageVector = Icons.Outlined.LightMode,
                     contentDescription = contentDescription,
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .size(20.dp)
                         .graphicsLayer {
-                            alpha = iconProgress
-                            val scale = 0.56f + iconProgress * 0.44f
+                            alpha = iconAlpha(0f)
+                            val scale = 0.56f + alpha * 0.44f
                             scaleX = scale
                             scaleY = scale
-                            rotationZ = 56f * (1f - iconProgress)
+                            rotationZ = -56f * (1f - alpha)
+                        }
+                )
+                Icon(
+                    imageVector = Icons.Outlined.DarkMode,
+                    contentDescription = contentDescription,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer {
+                            alpha = iconAlpha(1f)
+                            val scale = 0.56f + alpha * 0.44f
+                            scaleX = scale
+                            scaleY = scale
+                            rotationZ = 56f * (1f - alpha)
+                        }
+                )
+                Icon(
+                    imageVector = Icons.Outlined.BrightnessAuto,
+                    contentDescription = contentDescription,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer {
+                            alpha = iconAlpha(2f)
+                            val scale = 0.56f + alpha * 0.44f
+                            scaleX = scale
+                            scaleY = scale
+                            rotationZ = -56f * (1f - alpha)
                         }
                 )
             }
