@@ -583,6 +583,7 @@ private fun NeriAppContent(
     val showNowPlayingProgressQualitySwitch by repo.nowPlayingProgressShowQualitySwitchFlow.collectAsState(initial = true)
     val showNowPlayingProgressAudioCodec by repo.nowPlayingProgressShowAudioCodecFlow.collectAsState(initial = true)
     val showNowPlayingProgressAudioSpec by repo.nowPlayingProgressShowAudioSpecFlow.collectAsState(initial = true)
+    val silentGitHubSyncFailure by repo.silentGitHubSyncFailureFlow.collectAsState(initial = false)
     val showLyricTranslation by repo.showLyricTranslationFlow.collectAsState(initial = true)
     val defaultStartDestination by repo.defaultStartDestinationFlow.collectAsState(initial = Destinations.Home.route)
     val showHomeContinueCard by repo.homeCardContinueFlow.collectAsState(initial = true)
@@ -1544,6 +1545,10 @@ private fun NeriAppContent(
                                                     )
                                                 }.getOrThrow()
                                             }
+                                        },
+                                        advancedLyricsEnabled = advancedLyricsEnabled,
+                                        onAdvancedLyricsEnabledChange = { enabled ->
+                                            scope.launch { repo.setAdvancedLyricsEnabled(enabled) }
                                         },
                                         advancedBlurEnabled = advancedBlurEnabled,
                                         onAdvancedBlurEnabledChange = { enabled ->
