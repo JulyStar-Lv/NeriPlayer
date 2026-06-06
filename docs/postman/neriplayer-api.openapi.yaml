@@ -1,0 +1,1932 @@
+openapi: 3.1.0
+info:
+  title: NeriPlayer API Interfaces
+  version: "1.0.0"
+  description: >
+    Extracted from the NeriPlayer repository. This file focuses on API shape and
+    reusable schemas/components for Postman documentation. Some upstream services
+    use private signing protocols; use the Postman collection scripts for runnable
+    encrypted NetEase and Bilibili WBI requests.
+servers:
+  - url: https://neriplayer.hancat.work
+    description: Default Listen Together Worker
+tags:
+  - name: ListenTogether
+  - name: NetEase
+  - name: Bilibili
+  - name: QQMusic
+  - name: LRCLIB
+  - name: YouTubeMusic
+  - name: AuthUtilities
+  - name: GitHubSync
+  - name: WebDAV
+paths:
+  /healthz:
+    get:
+      tags: [ListenTogether]
+      summary: Listen Together health check
+      responses:
+        "200":
+          description: Worker is reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/rooms:
+    options:
+      tags: [ListenTogether]
+      summary: CORS preflight for Listen Together API
+      responses:
+        "200":
+          description: CORS preflight accepted
+    post:
+      tags: [ListenTogether]
+      summary: Create a Listen Together room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListenTogetherCreateRoomRequest"
+      responses:
+        "200":
+          description: Room created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListenTogetherRoomResponse"
+  /api/rooms/{roomId}/join:
+    post:
+      tags: [ListenTogether]
+      summary: Join a Listen Together room
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListenTogetherJoinRoomRequest"
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListenTogetherRoomResponse"
+  /api/rooms/{roomId}/state:
+    get:
+      tags: [ListenTogether]
+      summary: Get room state
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      responses:
+        "200":
+          description: Current room state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListenTogetherStateResponse"
+  /api/rooms/{roomId}/control:
+    post:
+      tags: [ListenTogether]
+      summary: Submit a control event
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListenTogetherEvent"
+      responses:
+        "200":
+          description: Event applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListenTogetherControlResponse"
+  /api/rooms/{roomId}/ws:
+    get:
+      tags: [ListenTogether]
+      summary: WebSocket upgrade endpoint
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket upgrade
+
+  /weapi/cloudsearch/get/web:
+    post:
+      tags: [NetEase]
+      summary: NetEase cloud search
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /eapi/w/login/cellphone:
+    post:
+      tags: [NetEase]
+      summary: Login by phone password or SMS captcha
+      servers:
+        - url: https://interface.music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseEapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/sms/captcha/sent:
+    post:
+      tags: [NetEase]
+      summary: Send SMS captcha
+      servers:
+        - url: https://interface.music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/sms/captcha/verify:
+    post:
+      tags: [NetEase]
+      summary: Verify SMS captcha
+      servers:
+        - url: https://interface.music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/personalized/playlist:
+    post:
+      tags: [NetEase]
+      summary: Recommended playlists
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /eapi/song/enhance/player/url/v1:
+    post:
+      tags: [NetEase]
+      summary: Song download URL v1
+      servers:
+        - url: https://interface.music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseEapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/song/enhance/player/url:
+    post:
+      tags: [NetEase]
+      summary: Legacy song URL by bitrate
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/v3/song/detail:
+    post:
+      tags: [NetEase]
+      summary: Song detail
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/user/playlist:
+    post:
+      tags: [NetEase]
+      summary: User playlists
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /eapi/mine/rn/resource/list:
+    post:
+      tags: [NetEase]
+      summary: User collected albums
+      servers:
+        - url: https://interface3.music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseEapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/user/djradio/get/subed:
+    post:
+      tags: [NetEase]
+      summary: User subscribed DJ radios
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/v1/album/{albumId}:
+    post:
+      tags: [NetEase]
+      summary: Album detail
+      servers:
+        - url: https://interface.music.163.com
+      parameters:
+        - name: albumId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /api/v6/playlist/detail:
+    post:
+      tags: [NetEase]
+      summary: Playlist or DJ radio detail
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: integer
+                n:
+                  type: integer
+                  default: 100000
+                s:
+                  type: integer
+                  default: 8
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /playlist:
+    get:
+      tags: [NetEase]
+      summary: Related playlists HTML page
+      servers:
+        - url: https://music.163.com
+      parameters:
+        - name: id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw NetEase HTML
+  /api/playlist/highquality/tags:
+    post:
+      tags: [NetEase]
+      summary: High quality playlist tags
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/playlist/highquality/list:
+    post:
+      tags: [NetEase]
+      summary: High quality playlists
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/song/like/get:
+    post:
+      tags: [NetEase]
+      summary: User liked song IDs
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/song/like:
+    post:
+      tags: [NetEase]
+      summary: Like or unlike a song
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /weapi/w/nuser/account/get:
+    post:
+      tags: [NetEase]
+      summary: Current user account
+      servers:
+        - url: https://music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseWeapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /eapi/song/lyric/v1:
+    post:
+      tags: [NetEase]
+      summary: New lyric API
+      servers:
+        - url: https://interface.music.163.com
+      requestBody:
+        $ref: "#/components/requestBodies/NeteaseEapiForm"
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /api/song/detail/:
+    get:
+      tags: [NetEase]
+      summary: Direct song detail API used by CloudMusicSearchApi
+      servers:
+        - url: https://music.163.com
+      parameters:
+        - name: id
+          in: query
+          schema:
+            type: integer
+        - name: ids
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Raw NetEase JSON
+  /api/song/lyric:
+    get:
+      tags: [NetEase]
+      summary: Direct song lyric API used by CloudMusicSearchApi
+      servers:
+        - url: https://music.163.com
+      parameters:
+        - name: id
+          in: query
+          schema:
+            type: integer
+        - name: lv
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw NetEase JSON
+
+  /x/web-interface/nav:
+    get:
+      tags: [Bilibili]
+      summary: Bilibili nav and WBI image keys
+      servers:
+        - url: https://api.bilibili.com
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/frontend/finger/spi:
+    get:
+      tags: [Bilibili]
+      summary: Anonymous fingerprint cookies
+      servers:
+        - url: https://api.bilibili.com
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /bapis/bilibili.api.ticket.v1.Ticket/GenWebTicket:
+    post:
+      tags: [Bilibili]
+      summary: Generate Web Ticket for WBI fallback
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: key_id
+          in: query
+          schema:
+            type: string
+        - name: hexsign
+          in: query
+          schema:
+            type: string
+        - name: csrf
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/player/wbi/playurl:
+    get:
+      tags: [Bilibili]
+      summary: WBI signed play URL
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: bvid
+          in: query
+          schema:
+            type: string
+        - name: avid
+          in: query
+          schema:
+            type: integer
+        - name: cid
+          in: query
+          schema:
+            type: integer
+        - name: fnval
+          in: query
+          schema:
+            type: integer
+            default: 272
+        - name: wts
+          in: query
+          schema:
+            type: integer
+        - name: w_rid
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Raw Bilibili play info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BiliPlayInfoResponse"
+  /x/web-interface/wbi/view:
+    get:
+      tags: [Bilibili]
+      summary: WBI signed video basic info
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: bvid
+          in: query
+          schema:
+            type: string
+        - name: aid
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/web-interface/wbi/search/type:
+    get:
+      tags: [Bilibili]
+      summary: WBI signed video search
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: search_type
+          in: query
+          schema:
+            type: string
+            default: video
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/web-interface/archive/has/like:
+    get:
+      tags: [Bilibili]
+      summary: Whether current user recently liked a video
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: bvid
+          in: query
+          schema:
+            type: string
+        - name: aid
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/v3/fav/folder/created/list-all:
+    get:
+      tags: [Bilibili]
+      summary: Created favorite folders
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: up_mid
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/v3/fav/folder/info:
+    get:
+      tags: [Bilibili]
+      summary: Favorite folder metadata
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: media_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/v3/fav/resource/list:
+    get:
+      tags: [Bilibili]
+      summary: Favorite folder contents
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: media_id
+          in: query
+          schema:
+            type: integer
+        - name: pn
+          in: query
+          schema:
+            type: integer
+        - name: ps
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/polymer/web-space/seasons_archives_list:
+    get:
+      tags: [Bilibili]
+      summary: Season archives list
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: mid
+          in: query
+          schema:
+            type: integer
+        - name: season_id
+          in: query
+          schema:
+            type: integer
+        - name: page_num
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+  /x/player/pagelist:
+    get:
+      tags: [Bilibili]
+      summary: Video page list by BVID or AID
+      servers:
+        - url: https://api.bilibili.com
+      parameters:
+        - name: bvid
+          in: query
+          schema:
+            type: string
+        - name: aid
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Raw Bilibili JSON
+
+  /soso/fcgi-bin/client_search_cp:
+    get:
+      tags: [QQMusic]
+      summary: QQ Music song search
+      servers:
+        - url: https://c.y.qq.com
+      parameters:
+        - name: w
+          in: query
+          schema:
+            type: string
+        - name: p
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: QQ Music search JSON
+  /cgi-bin/musicu.fcg:
+    get:
+      tags: [QQMusic]
+      summary: QQ Music song detail
+      servers:
+        - url: https://u.y.qq.com
+      parameters:
+        - name: data
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: QQ Music detail JSON
+  /lyric/fcgi-bin/fcg_query_lyric_new.fcg:
+    get:
+      tags: [QQMusic]
+      summary: QQ Music lyric
+      servers:
+        - url: https://c.y.qq.com
+      parameters:
+        - name: songmid
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: QQ Music lyric JSON
+
+  /api/get:
+    get:
+      tags: [LRCLIB]
+      summary: Exact lyric lookup
+      servers:
+        - url: https://lrclib.net
+      parameters:
+        - name: track_name
+          in: query
+          schema:
+            type: string
+        - name: artist_name
+          in: query
+          schema:
+            type: string
+        - name: duration
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: LRCLIB result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LrcLibResult"
+  /api/search:
+    get:
+      tags: [LRCLIB]
+      summary: Search lyrics
+      servers:
+        - url: https://lrclib.net
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: LRCLIB search array
+
+  /:
+    get:
+      tags: [ListenTogether, YouTubeMusic, NetEase]
+      summary: Root health check or bootstrap page, depending on selected server
+      servers:
+        - url: https://neriplayer.hancat.work
+        - url: https://music.163.com
+        - url: https://music.youtube.com
+        - url: https://www.youtube.com
+      parameters:
+        - name: themeRefresh
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bootstrap HTML containing ytcfg / INNERTUBE config
+  /watch:
+    get:
+      tags: [YouTubeMusic]
+      summary: YouTube watch page used by NewPipe and probe fallback
+      servers:
+        - url: https://music.youtube.com
+        - url: https://www.youtube.com
+      parameters:
+        - name: v
+          in: query
+          schema:
+            type: string
+        - name: list
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Watch page HTML
+  /youtubei/v1/browse:
+    post:
+      tags: [YouTubeMusic]
+      summary: YouTube Music browse
+      servers:
+        - url: https://music.youtube.com
+      parameters:
+        - name: key
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YouTubeMusicBrowseRequest"
+      responses:
+        "200":
+          description: Raw Innertube browse JSON
+  /youtubei/v1/search:
+    post:
+      tags: [YouTubeMusic]
+      summary: YouTube Music search
+      servers:
+        - url: https://music.youtube.com
+      parameters:
+        - name: key
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YouTubeMusicSearchRequest"
+      responses:
+        "200":
+          description: Raw Innertube search JSON
+  /youtubei/v1/player:
+    post:
+      tags: [YouTubeMusic]
+      summary: YouTube / YouTube Music player
+      servers:
+        - url: https://music.youtube.com
+        - url: https://www.youtube.com
+        - url: https://youtubei.googleapis.com
+      parameters:
+        - name: key
+          in: query
+          schema:
+            type: string
+        - name: id
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YouTubeMusicPlayerRequest"
+      responses:
+        "200":
+          description: Raw Innertube player JSON
+  /youtubei/v1/next:
+    post:
+      tags: [YouTubeMusic]
+      summary: YouTube Music next, used to discover lyrics browseId
+      servers:
+        - url: https://music.youtube.com
+      parameters:
+        - name: key
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YouTubeMusicNextRequest"
+      responses:
+        "200":
+          description: Raw Innertube next JSON
+
+  /m/login:
+    get:
+      tags: [AuthUtilities]
+      summary: NetEase WebView login page
+      servers:
+        - url: https://y.music.163.com
+      responses:
+        "200":
+          description: Login HTML
+  /login:
+    get:
+      tags: [AuthUtilities]
+      summary: Bilibili WebView login page
+      servers:
+        - url: https://passport.bilibili.com
+      responses:
+        "200":
+          description: Login HTML
+  /ServiceLogin:
+    get:
+      tags: [AuthUtilities]
+      summary: Google YouTube service login page
+      servers:
+        - url: https://accounts.google.com
+      parameters:
+        - name: service
+          in: query
+          schema:
+            type: string
+            default: youtube
+        - name: continue
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Login HTML
+  /settings/tokens/new:
+    get:
+      tags: [AuthUtilities]
+      summary: GitHub token creation page for repo-scoped sync token
+      servers:
+        - url: https://github.com
+      parameters:
+        - name: scopes
+          in: query
+          schema:
+            type: string
+        - name: description
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: GitHub settings HTML
+
+  /user:
+    get:
+      tags: [GitHubSync]
+      summary: Validate GitHub token
+      servers:
+        - url: https://api.github.com
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: GitHub user JSON
+  /user/repos:
+    post:
+      tags: [GitHubSync]
+      summary: Create backup repository
+      servers:
+        - url: https://api.github.com
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubCreateRepoRequest"
+      responses:
+        "201":
+          description: Repository created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubRepoResponse"
+  /repos/{owner}/{repo}/contents/{path}:
+    get:
+      tags: [GitHubSync]
+      summary: Read sync data file
+      servers:
+        - url: https://api.github.com
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GitHubOwner"
+        - $ref: "#/components/parameters/GitHubRepo"
+        - $ref: "#/components/parameters/GitHubPath"
+      responses:
+        "200":
+          description: File response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubFileResponse"
+    put:
+      tags: [GitHubSync]
+      summary: Create or update sync data file
+      servers:
+        - url: https://api.github.com
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GitHubOwner"
+        - $ref: "#/components/parameters/GitHubRepo"
+        - $ref: "#/components/parameters/GitHubPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubFileRequest"
+      responses:
+        "200":
+          description: File updated
+
+  /neriplayer-sync.json:
+    get:
+      tags: [WebDAV]
+      summary: Read WebDAV sync file
+      servers:
+        - url: https://example.com/dav
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: SyncData JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncData"
+    put:
+      tags: [WebDAV]
+      summary: Update WebDAV sync file
+      servers:
+        - url: https://example.com/dav
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncData"
+      responses:
+        "200":
+          description: Updated
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    basicAuth:
+      type: http
+      scheme: basic
+  parameters:
+    RoomId:
+      name: roomId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$"
+    GitHubOwner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+    GitHubRepo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+    GitHubPath:
+      name: path
+      in: path
+      required: true
+      schema:
+        type: string
+  requestBodies:
+    NeteaseWeapiForm:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: "#/components/schemas/NeteaseWeapiForm"
+    NeteaseEapiForm:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: "#/components/schemas/NeteaseEapiForm"
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        service:
+          type: string
+    NeteaseWeapiForm:
+      type: object
+      required: [params, encSecKey]
+      properties:
+        params:
+          type: string
+        encSecKey:
+          type: string
+    NeteaseEapiForm:
+      type: object
+      required: [params]
+      properties:
+        params:
+          type: string
+    SongSearchInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        songName:
+          type: string
+        singer:
+          type: string
+        duration:
+          type: string
+        source:
+          type: string
+          enum: [CLOUD_MUSIC, QQ_MUSIC]
+        albumName:
+          type: [string, "null"]
+        coverUrl:
+          type: [string, "null"]
+    SongDetails:
+      type: object
+      properties:
+        id:
+          type: string
+        songName:
+          type: string
+        singer:
+          type: string
+        album:
+          type: string
+        coverUrl:
+          type: [string, "null"]
+        lyric:
+          type: [string, "null"]
+        translatedLyric:
+          type: [string, "null"]
+    LrcLibResult:
+      type: object
+      properties:
+        syncedLyrics:
+          type: [string, "null"]
+        plainLyrics:
+          type: [string, "null"]
+        trackName:
+          type: string
+        artistName:
+          type: string
+
+    BiliPlayOptions:
+      type: object
+      properties:
+        qn:
+          type: [integer, "null"]
+        fnval:
+          type: integer
+          default: 272
+        fnver:
+          type: integer
+          default: 0
+        fourk:
+          type: integer
+          default: 0
+        platform:
+          type: string
+          default: pc
+    BiliDashStream:
+      type: object
+      properties:
+        id:
+          type: integer
+        baseUrl:
+          type: string
+        backupUrls:
+          type: array
+          items:
+            type: string
+        bandwidth:
+          type: integer
+        mimeType:
+          type: string
+        codecs:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        frameRate:
+          type: string
+        codecid:
+          type: integer
+    BiliDurl:
+      type: object
+      properties:
+        order:
+          type: integer
+        lengthMs:
+          type: integer
+        sizeBytes:
+          type: integer
+        url:
+          type: string
+        backupUrls:
+          type: array
+          items:
+            type: string
+    BiliVideoStats:
+      type: object
+      properties:
+        view:
+          type: integer
+        danmaku:
+          type: integer
+        reply:
+          type: integer
+        favorite:
+          type: integer
+        coin:
+          type: integer
+        share:
+          type: integer
+        like:
+          type: integer
+    BiliVideoPage:
+      type: object
+      properties:
+        cid:
+          type: integer
+        page:
+          type: integer
+        part:
+          type: string
+        durationSec:
+          type: integer
+        width:
+          type: integer
+        height:
+          type: integer
+    BiliPlayInfoResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+    BiliFavFolder:
+      type: object
+      properties:
+        mediaId:
+          type: integer
+        fid:
+          type: integer
+        mid:
+          type: integer
+        title:
+          type: string
+        coverUrl:
+          type: string
+        intro:
+          type: string
+        count:
+          type: integer
+
+    YouTubeMusicContext:
+      type: object
+      properties:
+        client:
+          type: object
+          properties:
+            clientName:
+              type: string
+              default: WEB_REMIX
+            clientVersion:
+              type: string
+            hl:
+              type: string
+            gl:
+              type: string
+            visitorData:
+              type: string
+            utcOffsetMinutes:
+              type: integer
+            userAgent:
+              type: string
+            platform:
+              type: string
+              default: DESKTOP
+        user:
+          type: object
+          properties:
+            lockedSafetyMode:
+              type: boolean
+    YouTubeMusicBrowseRequest:
+      type: object
+      required: [context]
+      properties:
+        context:
+          $ref: "#/components/schemas/YouTubeMusicContext"
+        browseId:
+          type: string
+        continuation:
+          type: string
+    YouTubeMusicSearchRequest:
+      type: object
+      required: [context, query]
+      properties:
+        context:
+          $ref: "#/components/schemas/YouTubeMusicContext"
+        query:
+          type: string
+        params:
+          type: string
+        continuation:
+          type: string
+    YouTubeMusicPlayerRequest:
+      type: object
+      required: [context, videoId]
+      properties:
+        context:
+          $ref: "#/components/schemas/YouTubeMusicContext"
+        videoId:
+          type: string
+        contentCheckOk:
+          type: boolean
+        racyCheckOk:
+          type: boolean
+    YouTubeMusicNextRequest:
+      type: object
+      required: [context, videoId]
+      properties:
+        context:
+          $ref: "#/components/schemas/YouTubeMusicContext"
+        videoId:
+          type: string
+        isAudioOnly:
+          type: boolean
+    YouTubeMusicLibraryPlaylist:
+      type: object
+      properties:
+        browseId:
+          type: string
+        playlistId:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        coverUrl:
+          type: string
+        trackCount:
+          type: [integer, "null"]
+    YouTubeMusicPlaylistTrack:
+      type: object
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+        artist:
+          type: string
+        album:
+          type: string
+        durationText:
+          type: string
+        durationMs:
+          type: integer
+        coverUrl:
+          type: string
+    YouTubeMusicPlayableAudio:
+      type: object
+      properties:
+        url:
+          type: string
+        durationMs:
+          type: integer
+        mimeType:
+          type: [string, "null"]
+        contentLength:
+          type: [integer, "null"]
+        bitrate:
+          type: integer
+
+    ListenTogetherTrack:
+      type: object
+      required: [stableKey, channelId, audioId, name, artist]
+      properties:
+        stableKey:
+          type: string
+        channelId:
+          type: string
+          enum: [netease, bilibili, youtubeMusic, local]
+        audioId:
+          type: string
+        subAudioId:
+          type: [string, "null"]
+        playlistContextId:
+          type: [string, "null"]
+        mediaUri:
+          type: [string, "null"]
+        streamUrl:
+          type: [string, "null"]
+        name:
+          type: string
+        artist:
+          type: string
+        album:
+          type: [string, "null"]
+        durationMs:
+          type: integer
+          default: 0
+        coverUrl:
+          type: [string, "null"]
+    ListenTogetherRoomSettings:
+      type: object
+      properties:
+        allowMemberControl:
+          type: boolean
+          default: true
+        autoPauseOnMemberChange:
+          type: boolean
+          default: true
+        shareAudioLinks:
+          type: boolean
+          default: true
+    ListenTogetherMember:
+      type: object
+      properties:
+        userUuid:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        userId:
+          type: [string, "null"]
+        role:
+          type: string
+          enum: [controller, listener]
+        joinedAt:
+          type: integer
+    ListenTogetherPlaybackState:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [playing, paused]
+          default: paused
+        basePositionMs:
+          type: integer
+          default: 0
+        baseTimestampMs:
+          type: integer
+          default: 0
+        playbackRate:
+          type: number
+          default: 1
+    ListenTogetherRoomState:
+      type: object
+      properties:
+        roomId:
+          type: string
+        version:
+          type: integer
+        schemaVersion:
+          type: integer
+          default: 1
+        controllerUserUuid:
+          type: [string, "null"]
+        controllerUserId:
+          type: [string, "null"]
+        controllerHeartbeatAt:
+          type: [integer, "null"]
+        settings:
+          $ref: "#/components/schemas/ListenTogetherRoomSettings"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListenTogetherMember"
+        queue:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListenTogetherTrack"
+        currentIndex:
+          type: integer
+        track:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherTrack"
+            - type: "null"
+        playback:
+          $ref: "#/components/schemas/ListenTogetherPlaybackState"
+        controllerOfflineSince:
+          type: [integer, "null"]
+        roomStatus:
+          type: string
+          enum: [active, controller_offline, closed]
+        closedReason:
+          type: [string, "null"]
+        updatedAt:
+          type: integer
+    ListenTogetherInitialSnapshot:
+      type: object
+      properties:
+        queue:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListenTogetherTrack"
+        currentIndex:
+          type: integer
+          default: 0
+        track:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherTrack"
+            - type: "null"
+        settings:
+          $ref: "#/components/schemas/ListenTogetherRoomSettings"
+        isPlaying:
+          type: boolean
+        positionMs:
+          type: integer
+    ListenTogetherCreateRoomRequest:
+      type: object
+      required: [userUuid, nickname, initialSnapshot]
+      properties:
+        userUuid:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 24
+        initialSnapshot:
+          $ref: "#/components/schemas/ListenTogetherInitialSnapshot"
+    ListenTogetherJoinRoomRequest:
+      type: object
+      required: [userUuid, nickname]
+      properties:
+        userUuid:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 24
+    ListenTogetherRoomResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        roomId:
+          type: [string, "null"]
+        userUuid:
+          type: [string, "null"]
+        userId:
+          type: [string, "null"]
+        nickname:
+          type: [string, "null"]
+        role:
+          type: [string, "null"]
+        autoPauseOnJoin:
+          type: boolean
+        token:
+          type: [string, "null"]
+        state:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherRoomState"
+            - type: "null"
+        wsUrl:
+          type: [string, "null"]
+        error:
+          type: [string, "null"]
+    ListenTogetherStateResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        state:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherRoomState"
+            - type: "null"
+        expectedPositionMs:
+          type: [integer, "null"]
+        autoPauseOnJoin:
+          type: boolean
+        error:
+          type: [string, "null"]
+    ListenTogetherEvent:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum:
+            - PLAY
+            - PAUSE
+            - SEEK
+            - SET_TRACK
+            - SET_QUEUE
+            - REQUEST_PLAY
+            - REQUEST_PAUSE
+            - REQUEST_SEEK
+            - REQUEST_SET_TRACK
+            - HEARTBEAT
+            - REQUEST_LINK
+            - LINK_READY
+            - UPDATE_SETTINGS
+        eventId:
+          type: [string, "null"]
+        clientTimeMs:
+          type: [integer, "null"]
+        positionMs:
+          type: [integer, "null"]
+        currentIndex:
+          type: [integer, "null"]
+        track:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherTrack"
+            - type: "null"
+        queue:
+          type: [array, "null"]
+          items:
+            $ref: "#/components/schemas/ListenTogetherTrack"
+        roomSettings:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherRoomSettings"
+            - type: "null"
+        shouldPlay:
+          type: [boolean, "null"]
+        state:
+          type: [string, "null"]
+        requestTrackStableKey:
+          type: [string, "null"]
+    ListenTogetherCause:
+      type: object
+      properties:
+        userUuid:
+          type: [string, "null"]
+        userId:
+          type: [string, "null"]
+        nickname:
+          type: [string, "null"]
+        eventId:
+          type: [string, "null"]
+        type:
+          type: [string, "null"]
+    ListenTogetherAppliedEvent:
+      type: object
+      properties:
+        type:
+          type: string
+        roomId:
+          type: [string, "null"]
+        version:
+          type: [integer, "null"]
+        state:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherRoomState"
+            - type: "null"
+        expectedPositionMs:
+          type: [integer, "null"]
+        causedBy:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherCause"
+            - type: "null"
+    ListenTogetherControlResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        applied:
+          anyOf:
+            - $ref: "#/components/schemas/ListenTogetherAppliedEvent"
+            - type: "null"
+        error:
+          type: [string, "null"]
+
+    GitHubCreateRepoRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          default: NeriPlayer backup data
+        private:
+          type: boolean
+          default: true
+        auto_init:
+          type: boolean
+          default: true
+    GitHubRepoResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        full_name:
+          type: string
+        private:
+          type: boolean
+        default_branch:
+          type: string
+    GitHubFileResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        sha:
+          type: string
+        size:
+          type: integer
+        content:
+          type: string
+        encoding:
+          type: string
+    GitHubFileRequest:
+      type: object
+      required: [message, content]
+      properties:
+        message:
+          type: string
+        content:
+          type: string
+          description: Base64 encoded file content
+        sha:
+          type: [string, "null"]
+        branch:
+          type: string
+          default: main
+
+    SyncData:
+      type: object
+      required: [deviceId, deviceName]
+      properties:
+        version:
+          type: string
+          default: "2.0"
+        deviceId:
+          type: string
+        deviceName:
+          type: string
+        lastModified:
+          type: integer
+        playlists:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncPlaylist"
+        favoritePlaylists:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncFavoritePlaylist"
+        recentPlays:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncRecentPlay"
+        syncLog:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncLogEntry"
+        recentPlayDeletions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncRecentPlayDeletion"
+        playbackStats:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncTrackStat"
+    SyncPlaylist:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        songs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncSong"
+        createdAt:
+          type: integer
+        modifiedAt:
+          type: integer
+        isDeleted:
+          type: boolean
+    SyncSong:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        artist:
+          type: string
+        album:
+          type: string
+        albumId:
+          type: integer
+        durationMs:
+          type: integer
+        coverUrl:
+          type: [string, "null"]
+        mediaUri:
+          type: [string, "null"]
+        addedAt:
+          type: integer
+        matchedLyric:
+          type: [string, "null"]
+        matchedTranslatedLyric:
+          type: [string, "null"]
+        matchedLyricSource:
+          type: [string, "null"]
+        matchedSongId:
+          type: [string, "null"]
+        userLyricOffsetMs:
+          type: integer
+        customCoverUrl:
+          type: [string, "null"]
+        customName:
+          type: [string, "null"]
+        customArtist:
+          type: [string, "null"]
+        originalName:
+          type: [string, "null"]
+        originalArtist:
+          type: [string, "null"]
+        originalCoverUrl:
+          type: [string, "null"]
+        originalLyric:
+          type: [string, "null"]
+        originalTranslatedLyric:
+          type: [string, "null"]
+        channelId:
+          type: [string, "null"]
+        audioId:
+          type: [string, "null"]
+        subAudioId:
+          type: [string, "null"]
+        playlistContextId:
+          type: [string, "null"]
+    SyncRecentPlay:
+      type: object
+      properties:
+        songId:
+          type: integer
+        song:
+          $ref: "#/components/schemas/SyncSong"
+        playedAt:
+          type: integer
+        deviceId:
+          type: string
+    SyncRecentPlayDeletion:
+      type: object
+      properties:
+        songId:
+          type: integer
+        album:
+          type: string
+        mediaUri:
+          type: [string, "null"]
+        deletedAt:
+          type: integer
+        deviceId:
+          type: string
+    SyncFavoritePlaylist:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        coverUrl:
+          type: [string, "null"]
+        trackCount:
+          type: integer
+        source:
+          type: string
+        songs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncSong"
+        addedTime:
+          type: integer
+        modifiedAt:
+          type: integer
+        isDeleted:
+          type: boolean
+        sortOrder:
+          type: integer
+        browseId:
+          type: [string, "null"]
+        playlistId:
+          type: [string, "null"]
+        subtitle:
+          type: [string, "null"]
+        fid:
+          type: [integer, "null"]
+        mid:
+          type: [integer, "null"]
+        bvid:
+          type: [string, "null"]
+    SyncLogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: integer
+        deviceId:
+          type: string
+        action:
+          type: string
+          enum:
+            - CREATE_PLAYLIST
+            - DELETE_PLAYLIST
+            - RENAME_PLAYLIST
+            - ADD_SONG
+            - REMOVE_SONG
+            - REORDER_SONGS
+            - PLAY_SONG
+        playlistId:
+          type: [integer, "null"]
+        songId:
+          type: [integer, "null"]
+        details:
+          type: [string, "null"]
+    SyncTrackStat:
+      type: object
+      properties:
+        identityKey:
+          type: string
+        name:
+          type: string
+        artist:
+          type: string
+        album:
+          type: string
+        totalListenMs:
+          type: integer
+        playCount:
+          type: integer
+        lastPlayedAt:
+          type: integer
+        firstPlayedAt:
+          type: integer
+        coverUrl:
+          type: [string, "null"]
+        durationMs:
+          type: integer
+        mediaUri:
+          type: [string, "null"]
+        id:
+          type: integer
+        albumId:
+          type: integer

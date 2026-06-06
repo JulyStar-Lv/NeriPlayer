@@ -586,7 +586,6 @@ private fun NeriAppContent(
     val silentGitHubSyncFailure by repo.silentGitHubSyncFailureFlow.collectAsState(initial = false)
     val showLyricTranslation by repo.showLyricTranslationFlow.collectAsState(initial = true)
     val defaultStartDestination by repo.defaultStartDestinationFlow.collectAsState(initial = Destinations.Home.route)
-    val autoShowKeyboard by repo.autoShowKeyboardFlow.collectAsState(initial = false)
     val showHomeContinueCard by repo.homeCardContinueFlow.collectAsState(initial = true)
     val showHomeRecentCard by repo.homeCardRecentFlow.collectAsState(initial = true)
     val showHomeTrendingCard by repo.homeCardTrendingFlow.collectAsState(initial = true)
@@ -1668,10 +1667,6 @@ private fun NeriAppContent(
                                         defaultStartDestination = defaultStartDestination,
                                         onDefaultStartDestinationChange = { route ->
                                             scope.launch { repo.setDefaultStartDestination(route) }
-                                        },
-                                        autoShowKeyboard = autoShowKeyboard,
-                                        onAutoShowKeyboardChange = { enabled ->
-                                            scope.launch { repo.setAutoShowKeyboard(enabled) }
                                         },
                                         showHomeContinueCard = showHomeContinueCard,
                                         onShowHomeContinueCardChange = { enabled ->
