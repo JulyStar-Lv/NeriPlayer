@@ -1,0 +1,4130 @@
+{
+  "info": {
+    "_postman_id": "5e1b4e16-85f5-4b0d-9f74-neriplayer-api",
+    "name": "NeriPlayer API Interfaces",
+    "description": "从 NeriPlayer 仓库源码整理的接口集合。覆盖网易云音乐、Bilibili、QQ 音乐、LRCLIB、YouTube Music、一起听 Worker、GitHub Contents API、WebDAV 同步接口。导入后请选择同目录的 NeriPlayer.postman_environment.json 环境。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Listen Together Worker",
+      "description": "来源: app/src/main/java/moe/ouom/neriplayer/listentogether 和 np-submodule/NeriPlayer-LTW/src/worker.js",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://neriplayer.hancat.work/healthz",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "healthz"
+              ]
+            },
+            "description": "GET /healthz。返回 { ok, service }。"
+          }
+        },
+        {
+          "name": "Root Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://neriplayer.hancat.work/",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ]
+            },
+            "description": "GET /。Worker 与 /healthz 同样返回 { ok, service }。"
+          }
+        },
+        {
+          "name": "CORS Preflight",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "https://example.com"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "content-type,authorization"
+              }
+            ],
+            "url": {
+              "raw": "https://neriplayer.hancat.work/api/rooms",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms"
+              ]
+            },
+            "description": "Worker 对任意路径的 OPTIONS 预检响应，返回 access-control-allow-*。"
+          }
+        },
+        {
+          "name": "Create Room",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.roomId) pm.environment.set('lt_room_id', json.roomId);",
+                  "if (json.token) pm.environment.set('lt_token', json.token);",
+                  "if (json.wsUrl) pm.environment.set('lt_ws_url', json.wsUrl);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userUuid\": \"{{lt_user_uuid}}\",\n  \"nickname\": \"{{lt_nickname}}\",\n  \"initialSnapshot\": {\n    \"queue\": [\n      {\n        \"stableKey\": \"netease:33894312\",\n        \"channelId\": \"netease\",\n        \"audioId\": \"33894312\",\n        \"name\": \"Sample Track\",\n        \"artist\": \"Sample Artist\",\n        \"album\": \"Sample Album\",\n        \"durationMs\": 240000,\n        \"coverUrl\": \"https://example.com/cover.jpg\"\n      }\n    ],\n    \"currentIndex\": 0,\n    \"settings\": {\n      \"allowMemberControl\": true,\n      \"autoPauseOnMemberChange\": true,\n      \"shareAudioLinks\": true\n    },\n    \"isPlaying\": false,\n    \"positionMs\": 0\n  }\n}"
+            },
+            "url": {
+              "raw": "https://neriplayer.hancat.work/api/rooms",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms"
+              ]
+            },
+            "description": "POST /api/rooms。创建房间，响应中的 roomId/token/wsUrl 会自动写入环境变量。"
+          }
+        },
+        {
+          "name": "Join Room",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.roomId) pm.environment.set('lt_room_id', json.roomId);",
+                  "if (json.token) pm.environment.set('lt_token', json.token);",
+                  "if (json.wsUrl) pm.environment.set('lt_ws_url', json.wsUrl);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userUuid\": \"{{lt_listener_uuid}}\",\n  \"nickname\": \"{{lt_listener_nickname}}\"\n}"
+            },
+            "url": {
+              "raw": "https://neriplayer.hancat.work/api/rooms/{{lt_room_id}}/join",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{lt_room_id}}",
+                "join"
+              ]
+            },
+            "description": "POST /api/rooms/:roomId/join。加入房间。"
+          }
+        },
+        {
+          "name": "Get Room State",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://neriplayer.hancat.work/api/rooms/{{lt_room_id}}/state",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{lt_room_id}}",
+                "state"
+              ]
+            },
+            "description": "GET /api/rooms/:roomId/state。获取房间快照和 expectedPositionMs。"
+          }
+        },
+        {
+          "name": "Send Control Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{lt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"PLAY\",\n  \"eventId\": \"evt-{{$timestamp}}\",\n  \"clientTimeMs\": {{$timestamp}}000,\n  \"positionMs\": 0,\n  \"currentIndex\": 0,\n  \"shouldPlay\": true,\n  \"state\": \"playing\"\n}"
+            },
+            "url": {
+              "raw": "https://neriplayer.hancat.work/api/rooms/{{lt_room_id}}/control",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{lt_room_id}}",
+                "control"
+              ]
+            },
+            "description": "POST /api/rooms/:roomId/control。支持 PLAY/PAUSE/SEEK/SET_TRACK/SET_QUEUE/HEARTBEAT/LINK_READY/UPDATE_SETTINGS，以及 REQUEST_* 事件。"
+          }
+        },
+        {
+          "name": "Update Room Settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{lt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"UPDATE_SETTINGS\",\n  \"eventId\": \"evt-{{$timestamp}}\",\n  \"roomSettings\": {\n    \"allowMemberControl\": true,\n    \"autoPauseOnMemberChange\": true,\n    \"shareAudioLinks\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "https://neriplayer.hancat.work/api/rooms/{{lt_room_id}}/control",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{lt_room_id}}",
+                "control"
+              ]
+            },
+            "description": "房主更新一起听设置。"
+          }
+        },
+        {
+          "name": "Request Audio Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{lt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"REQUEST_LINK\",\n  \"eventId\": \"evt-{{$timestamp}}\",\n  \"requestTrackStableKey\": \"netease:33894312\",\n  \"currentIndex\": 0\n}"
+            },
+            "url": {
+              "raw": "https://neriplayer.hancat.work/api/rooms/{{lt_room_id}}/control",
+              "protocol": "https",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{lt_room_id}}",
+                "control"
+              ]
+            },
+            "description": "听众请求房主发布当前曲目的直链。"
+          }
+        },
+        {
+          "name": "WebSocket URL",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "wss://neriplayer.hancat.work/api/rooms/{{lt_room_id}}/ws?token={{lt_token}}",
+              "protocol": "wss",
+              "host": [
+                "neriplayer",
+                "hancat",
+                "work"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{lt_room_id}}",
+                "ws"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{lt_token}}"
+                }
+              ]
+            },
+            "description": "Postman Collection 里作为 URL 记录。实际调试可在 Postman WebSocket 面板打开 {{lt_ws_url}}，发送 {\"type\":\"ping\"} 或 ListenTogetherEvent JSON。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "NetEase Cloud Music",
+      "description": "来源: app/src/main/java/moe/ouom/neriplayer/core/api/netease/NeteaseClient.kt 和 core/api/search/CloudMusicSearchApi.kt。WEAPI/EAPI 请求由本文件夹 pre-request 脚本自动生成 params/encSecKey。",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "(function () {",
+              "const rawPayloadTemplate = pm.variables.get('netease_payload');",
+              "if (!rawPayloadTemplate) { return; }",
+              "const mode = (pm.variables.get('netease_mode') || 'WEAPI').toUpperCase();",
+              "const payload = JSON.parse(pm.variables.replaceIn(rawPayloadTemplate));",
+              "const presetKey = '0CoJUm6Qyw8W8jud';",
+              "const iv = '0102030405060708';",
+              "const eapiKey = 'e82ckenh8dichen8';",
+              "const rsaModulus = 'e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7';",
+              "const rsaExponent = '010001';",
+              "function aes(text, key, cipherMode, aesIv, out) {",
+              "  const options = { mode: CryptoJS.mode[cipherMode], padding: CryptoJS.pad.Pkcs7 };",
+              "  if (aesIv) options.iv = CryptoJS.enc.Utf8.parse(aesIv);",
+              "  const encrypted = CryptoJS.AES.encrypt(text, CryptoJS.enc.Utf8.parse(key), options);",
+              "  return out === 'hex' ? encrypted.ciphertext.toString(CryptoJS.enc.Hex) : encrypted.ciphertext.toString(CryptoJS.enc.Base64);",
+              "}",
+              "function md5(text) { return CryptoJS.MD5(text).toString(CryptoJS.enc.Hex); }",
+              "function randomKey() { const chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let out=''; for (let i=0;i<16;i++) out += chars[Math.floor(Math.random()*chars.length)]; return out; }",
+              "function toHex(text) { return Array.from(text).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(''); }",
+              "function powMod(base, exp, mod) { let result=1n; base%=mod; while (exp>0n) { if (exp & 1n) result=(result*base)%mod; exp >>= 1n; base=(base*base)%mod; } return result; }",
+              "function rsaNoPadding(text) { const m=BigInt('0x' + toHex(text)); const e=BigInt('0x' + rsaExponent); const n=BigInt('0x' + rsaModulus); return powMod(m,e,n).toString(16).padStart(256,'0'); }",
+              "const json = JSON.stringify(payload);",
+              "if (mode === 'WEAPI') {",
+              "  const secret = randomKey();",
+              "  const enc1 = aes(json, presetKey, 'CBC', iv, 'base64');",
+              "  pm.variables.set('netease_params', aes(enc1, secret, 'CBC', iv, 'base64'));",
+              "  pm.variables.set('netease_encSecKey', rsaNoPadding(secret.split('').reverse().join('')));",
+              "} else if (mode === 'EAPI') {",
+              "  const path = (pm.variables.get('netease_path') || pm.request.url.getPath()).replace('/eapi', '/api');",
+              "  const message = path + '-36cd479b6b5-' + json + '-36cd479b6b5-' + md5('nobody' + path + 'use' + json + 'md5forencrypt');",
+              "  pm.variables.set('netease_params', aes(message, eapiKey, 'ECB', null, 'hex').toUpperCase());",
+              "  pm.variables.set('netease_encSecKey', '');",
+              "}",
+              "})();"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Ensure Web Session",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              }
+            ],
+            "url": {
+              "raw": "https://music.163.com/",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ]
+            },
+            "description": "对应 ensureWeapiSession()，用于预热 __csrf。"
+          }
+        },
+        {
+          "name": "Login By Phone Password",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "EAPI"
+            },
+            {
+              "key": "netease_path",
+              "value": "/api/w/login/cellphone"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"phone\":\"{{netease_phone}}\",\"countrycode\":{{netease_country_code}},\"remember\":\"true\",\"password\":\"{{netease_password_md5}}\",\"type\":\"1\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface.music.163.com/eapi/w/login/cellphone",
+              "protocol": "https",
+              "host": [
+                "interface",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "eapi",
+                "w",
+                "login",
+                "cellphone"
+              ]
+            },
+            "description": "loginByPhone()。password 需先填 MD5 到 netease_password_md5。"
+          }
+        },
+        {
+          "name": "Send SMS Captcha",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"cellphone\":\"{{netease_phone}}\",\"ctcode\":\"{{netease_country_code}}\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface.music.163.com/weapi/sms/captcha/sent?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "interface",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "sms",
+                "captcha",
+                "sent"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "sendCaptcha()。"
+          }
+        },
+        {
+          "name": "Verify SMS Captcha",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"cellphone\":\"{{netease_phone}}\",\"captcha\":\"{{netease_captcha}}\",\"ctcode\":\"{{netease_country_code}}\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface.music.163.com/weapi/sms/captcha/verify?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "interface",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "sms",
+                "captcha",
+                "verify"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "verifyCaptcha()。"
+          }
+        },
+        {
+          "name": "Login By SMS Captcha",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "EAPI"
+            },
+            {
+              "key": "netease_path",
+              "value": "/api/w/login/cellphone"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"phone\":\"{{netease_phone}}\",\"countrycode\":\"{{netease_country_code}}\",\"remember\":\"true\",\"type\":\"1\",\"captcha\":\"{{netease_captcha}}\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface.music.163.com/eapi/w/login/cellphone",
+              "protocol": "https",
+              "host": [
+                "interface",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "eapi",
+                "w",
+                "login",
+                "cellphone"
+              ]
+            },
+            "description": "loginByCaptcha()。"
+          }
+        },
+        {
+          "name": "Search Songs",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"s\":\"{{netease_keyword}}\",\"type\":\"1\",\"limit\":\"20\",\"offset\":\"0\",\"total\":\"true\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/cloudsearch/get/web?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "cloudsearch",
+                "get",
+                "web"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "searchSongs()。"
+          }
+        },
+        {
+          "name": "Recommended Playlists",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"limit\":\"30\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/personalized/playlist?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "personalized",
+                "playlist"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getRecommendedPlaylists()。"
+          }
+        },
+        {
+          "name": "Song Download URL V1",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "EAPI"
+            },
+            {
+              "key": "netease_path",
+              "value": "/api/song/enhance/player/url/v1"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"ids\":\"[{{netease_song_id}}]\",\"level\":\"{{netease_quality_level}}\",\"encodeType\":\"flac\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface.music.163.com/eapi/song/enhance/player/url/v1",
+              "protocol": "https",
+              "host": [
+                "interface",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "eapi",
+                "song",
+                "enhance",
+                "player",
+                "url",
+                "v1"
+              ]
+            },
+            "description": "getSongDownloadUrl()。音质 level: standard/exhigh/lossless/hires/jyeffect/sky/jymaster。"
+          }
+        },
+        {
+          "name": "Song URL Legacy",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"ids\":\"[{{netease_song_id}}]\",\"br\":\"320000\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/song/enhance/player/url?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "song",
+                "enhance",
+                "player",
+                "url"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getSongUrl()。"
+          }
+        },
+        {
+          "name": "Song Detail",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"c\":\"[{\\\"id\\\":{{netease_song_id}}}]\",\"ids\":\"[{{netease_song_id}}]\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/v3/song/detail?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "v3",
+                "song",
+                "detail"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getSongDetail()。"
+          }
+        },
+        {
+          "name": "Direct Song Detail API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.163.com/"
+              }
+            ],
+            "url": {
+              "raw": "https://music.163.com/api/song/detail/?id={{netease_song_id}}&ids=[{{netease_song_id}}]",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "api",
+                "song",
+                "detail"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{netease_song_id}}"
+                },
+                {
+                  "key": "ids",
+                  "value": "[{{netease_song_id}}]"
+                }
+              ]
+            },
+            "description": "CloudMusicSearchApi.getSongInfo() 中使用的直连详情接口。"
+          }
+        },
+        {
+          "name": "Direct Song Lyric API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.163.com/"
+              }
+            ],
+            "url": {
+              "raw": "https://music.163.com/api/song/lyric?id={{netease_song_id}}&lv=-1&tv=-1&rv=-1&yv=-1&ytv=-1&yrv=-1",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "api",
+                "song",
+                "lyric"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{netease_song_id}}"
+                },
+                {
+                  "key": "lv",
+                  "value": "-1"
+                },
+                {
+                  "key": "tv",
+                  "value": "-1"
+                },
+                {
+                  "key": "rv",
+                  "value": "-1"
+                },
+                {
+                  "key": "yv",
+                  "value": "-1"
+                },
+                {
+                  "key": "ytv",
+                  "value": "-1"
+                },
+                {
+                  "key": "yrv",
+                  "value": "-1"
+                }
+              ]
+            },
+            "description": "CloudMusicSearchApi.getSongInfo() 中使用的直连歌词接口。"
+          }
+        },
+        {
+          "name": "User Playlists",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"uid\":\"{{netease_user_id}}\",\"offset\":\"0\",\"limit\":\"30\",\"includeVideo\":\"true\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/user/playlist?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "user",
+                "playlist"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getUserPlaylists()，getUserCreatedPlaylists/getUserSubscribedPlaylists/getLikedPlaylistId 也基于此接口后处理。"
+          }
+        },
+        {
+          "name": "User Albums",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "EAPI"
+            },
+            {
+              "key": "netease_path",
+              "value": "/api/mine/rn/resource/list"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"userId\":\"{{netease_user_id}}\",\"offset\":\"0\",\"limit\":\"30\",\"pageType\":\"3\",\"needRcmd\":\"0\",\"isVistor\":\"false\",\"includeStarPodcast\":\"true\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface3.music.163.com/eapi/mine/rn/resource/list",
+              "protocol": "https",
+              "host": [
+                "interface3",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "eapi",
+                "mine",
+                "rn",
+                "resource",
+                "list"
+              ]
+            },
+            "description": "getUserAlbums() / getUserStaredAlbums()。"
+          }
+        },
+        {
+          "name": "User DJ Radios",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"uid\":\"{{netease_user_id}}\",\"offset\":\"0\",\"limit\":\"30\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/user/djradio/get/subed?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "user",
+                "djradio",
+                "get",
+                "subed"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getUserDjRadios()。"
+          }
+        },
+        {
+          "name": "Album Detail",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"n\":\"100000\",\"s\":\"8\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface.music.163.com/weapi/v1/album/{{netease_album_id}}?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "interface",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "v1",
+                "album",
+                "{{netease_album_id}}"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getAlbumDetail()。"
+          }
+        },
+        {
+          "name": "Playlist Detail API",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "id",
+                  "value": "{{netease_playlist_id}}"
+                },
+                {
+                  "key": "n",
+                  "value": "100000"
+                },
+                {
+                  "key": "s",
+                  "value": "8"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/api/v6/playlist/detail",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v6",
+                "playlist",
+                "detail"
+              ]
+            },
+            "description": "getPlaylistDetail()/getDjRadioDetail()。CryptoMode.API，不加密。"
+          }
+        },
+        {
+          "name": "Related Playlists HTML",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              }
+            ],
+            "url": {
+              "raw": "https://music.163.com/playlist?id={{netease_playlist_id}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "playlist"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{netease_playlist_id}}"
+                }
+              ]
+            },
+            "description": "getRelatedPlaylists()。源码会解析 HTML 中的相关歌单。"
+          }
+        },
+        {
+          "name": "High Quality Tags",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/api/playlist/highquality/tags?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "api",
+                "playlist",
+                "highquality",
+                "tags"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getHighQualityTags()。"
+          }
+        },
+        {
+          "name": "High Quality Playlists",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"cat\":\"全部\",\"limit\":50,\"lasttime\":0,\"total\":true}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/playlist/highquality/list?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "playlist",
+                "highquality",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getHighQualityPlaylists()。"
+          }
+        },
+        {
+          "name": "User Liked Song IDs",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"uid\":\"{{netease_user_id}}\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/song/like/get?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "song",
+                "like",
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getUserLikedSongIds()。"
+          }
+        },
+        {
+          "name": "Like Or Unlike Song",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"trackId\":\"{{netease_song_id}}\",\"like\":\"true\"}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/song/like?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "song",
+                "like"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "likeSong()。"
+          }
+        },
+        {
+          "name": "Current User Account",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "WEAPI"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                },
+                {
+                  "key": "encSecKey",
+                  "value": "{{netease_encSecKey}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://music.163.com/weapi/w/nuser/account/get?csrf_token={{netease_csrf}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "weapi",
+                "w",
+                "nuser",
+                "account",
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "csrf_token",
+                  "value": "{{netease_csrf}}"
+                }
+              ]
+            },
+            "description": "getCurrentUserAccount()/getCurrentUserId()。"
+          }
+        },
+        {
+          "name": "Lyric V1",
+          "variable": [
+            {
+              "key": "netease_mode",
+              "value": "EAPI"
+            },
+            {
+              "key": "netease_path",
+              "value": "/api/song/lyric/v1"
+            },
+            {
+              "key": "netease_payload",
+              "value": "{\"id\":\"{{netease_song_id}}\",\"cp\":\"false\",\"lv\":0,\"tv\":0,\"rv\":0,\"yv\":0,\"ytv\":0,\"yrv\":0}"
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{netease_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "params",
+                  "value": "{{netease_params}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://interface.music.163.com/eapi/song/lyric/v1",
+              "protocol": "https",
+              "host": [
+                "interface",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "eapi",
+                "song",
+                "lyric",
+                "v1"
+              ]
+            },
+            "description": "getLyricNew()。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bilibili",
+      "description": "来源: app/src/main/java/moe/ouom/neriplayer/core/api/bili/BiliClient.kt。WBI 请求先运行 Utilities/Refresh WBI mixin key。",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "(function () {",
+              "if (pm.variables.get('bili_wbi') !== 'true') { return; }",
+              "const raw = pm.variables.get('bili_query_json') || '{}';",
+              "const params = JSON.parse(pm.variables.replaceIn(raw));",
+              "const mixinKey = pm.collectionVariables.get('bili_mixin_key') || pm.environment.get('bili_mixin_key');",
+              "if (!mixinKey) throw new Error('Run Bilibili / Utilities / Refresh WBI mixin key first.');",
+              "function encode(v) { return encodeURIComponent(String(v)).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()); }",
+              "Object.keys(params).forEach(k => { params[k] = String(params[k]).replace(/[!'()*]/g, ''); });",
+              "params.wts = Math.floor(Date.now() / 1000).toString();",
+              "const query = Object.keys(params).sort().map(k => encode(k) + '=' + encode(params[k])).join('&');",
+              "params.w_rid = CryptoJS.MD5(query + mixinKey).toString();",
+              "Object.keys(params).forEach(k => pm.request.url.query.add({ key: k, value: params[k] }));",
+              "})();"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Utilities",
+          "item": [
+            {
+              "name": "Refresh WBI mixin key",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const root = pm.response.json();",
+                      "const img = root.data && root.data.wbi_img ? root.data.wbi_img.img_url : '';",
+                      "const sub = root.data && root.data.wbi_img ? root.data.wbi_img.sub_url : '';",
+                      "const idx = [46,47,18,2,53,8,23,32,15,50,10,31,58,3,45,35,27,43,5,49,33,9,42,19,29,28,14,39,12,38,41,13,37,48,7,16,24,55,40,61,26,17,0,1,60,51,30,4,22,25,54,21,56,62,6,63,57,20,34,52,59,11,36,44];",
+                      "function key(url) { return String(url).split('/').pop().split('.')[0]; }",
+                      "const raw = key(img) + key(sub);",
+                      "let mixed = '';",
+                      "idx.forEach(i => { if (i < raw.length) mixed += raw[i]; });",
+                      "pm.collectionVariables.set('bili_mixin_key', mixed.substring(0, 32));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Cookie",
+                    "value": "{{bili_cookie}}"
+                  },
+                  {
+                    "key": "User-Agent",
+                    "value": "{{bili_user_agent}}"
+                  },
+                  {
+                    "key": "Referer",
+                    "value": "https://www.bilibili.com"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.bilibili.com/x/web-interface/nav",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "bilibili",
+                    "com"
+                  ],
+                  "path": [
+                    "x",
+                    "web-interface",
+                    "nav"
+                  ]
+                },
+                "description": "NAV_URL。测试脚本会提取 wbi_img 并保存 bili_mixin_key。"
+              }
+            },
+            {
+              "name": "Anonymous Fingerprint",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "User-Agent",
+                    "value": "{{bili_mobile_user_agent}}"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.bilibili.com/x/frontend/finger/spi",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "bilibili",
+                    "com"
+                  ],
+                  "path": [
+                    "x",
+                    "frontend",
+                    "finger",
+                    "spi"
+                  ]
+                },
+                "description": "FINGERPRINT_URL。无 Cookie 时获取 buvid 等匿名指纹。"
+              }
+            },
+            {
+              "name": "Generate Web Ticket",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "User-Agent",
+                    "value": "{{bili_firefox_user_agent}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "https://api.bilibili.com/bapis/bilibili.api.ticket.v1.Ticket/GenWebTicket?key_id=ec02&hexsign={{bili_web_ticket_hexsign}}&context[ts]={{bili_web_ticket_ts}}&csrf={{bili_csrf}}",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "bilibili",
+                    "com"
+                  ],
+                  "path": [
+                    "bapis",
+                    "bilibili.api.ticket.v1.Ticket",
+                    "GenWebTicket"
+                  ],
+                  "query": [
+                    {
+                      "key": "key_id",
+                      "value": "ec02"
+                    },
+                    {
+                      "key": "hexsign",
+                      "value": "{{bili_web_ticket_hexsign}}"
+                    },
+                    {
+                      "key": "context[ts]",
+                      "value": "{{bili_web_ticket_ts}}"
+                    },
+                    {
+                      "key": "csrf",
+                      "value": "{{bili_csrf}}"
+                    }
+                  ]
+                },
+                "description": "WEB_TICKET_URL。hexsign 由 HMAC-SHA256('ts' + ts, 'XgwSnGZ1p') 生成；源码中作为 NAV 失败时的 WBI key 兜底。"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Play URL By BVID",
+          "variable": [
+            {
+              "key": "bili_wbi",
+              "value": "true"
+            },
+            {
+              "key": "bili_query_json",
+              "value": "{\"bvid\":\"{{bili_bvid}}\",\"cid\":\"{{bili_cid}}\",\"fnval\":\"272\",\"fnver\":\"0\",\"fourk\":\"0\",\"otype\":\"json\",\"platform\":\"pc\"}"
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/player/wbi/playurl",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "player",
+                "wbi",
+                "playurl"
+              ]
+            },
+            "description": "getPlayInfoByBvid()/getAllAudioStreams()。WBI 加签由文件夹脚本完成。"
+          }
+        },
+        {
+          "name": "Play URL By AID",
+          "variable": [
+            {
+              "key": "bili_wbi",
+              "value": "true"
+            },
+            {
+              "key": "bili_query_json",
+              "value": "{\"avid\":\"{{bili_aid}}\",\"cid\":\"{{bili_cid}}\",\"fnval\":\"272\",\"fnver\":\"0\",\"fourk\":\"0\",\"otype\":\"json\",\"platform\":\"pc\"}"
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/player/wbi/playurl",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "player",
+                "wbi",
+                "playurl"
+              ]
+            },
+            "description": "getPlayInfoByAvid()。与 BVID 版同 endpoint，参数改用 avid。WBI 加签由文件夹脚本完成。"
+          }
+        },
+        {
+          "name": "Video Basic Info By BVID",
+          "variable": [
+            {
+              "key": "bili_wbi",
+              "value": "true"
+            },
+            {
+              "key": "bili_query_json",
+              "value": "{\"bvid\":\"{{bili_bvid}}\"}"
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/web-interface/wbi/view",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "web-interface",
+                "wbi",
+                "view"
+              ]
+            },
+            "description": "getVideoBasicInfoByBvid()。"
+          }
+        },
+        {
+          "name": "Video Basic Info By AID",
+          "variable": [
+            {
+              "key": "bili_wbi",
+              "value": "true"
+            },
+            {
+              "key": "bili_query_json",
+              "value": "{\"aid\":\"{{bili_aid}}\"}"
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/web-interface/wbi/view",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "web-interface",
+                "wbi",
+                "view"
+              ]
+            },
+            "description": "getVideoBasicInfoByAvid()/getVideoStatsByAvid()。WBI 加签由文件夹脚本完成。"
+          }
+        },
+        {
+          "name": "Search Videos",
+          "variable": [
+            {
+              "key": "bili_wbi",
+              "value": "true"
+            },
+            {
+              "key": "bili_query_json",
+              "value": "{\"search_type\":\"video\",\"keyword\":\"{{bili_keyword}}\",\"order\":\"totalrank\",\"duration\":\"0\",\"tids\":\"0\",\"page\":\"1\"}"
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/web-interface/wbi/search/type",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "web-interface",
+                "wbi",
+                "search",
+                "type"
+              ]
+            },
+            "description": "searchVideos()。"
+          }
+        },
+        {
+          "name": "Has Liked Recently",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/web-interface/archive/has/like?bvid={{bili_bvid}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "web-interface",
+                "archive",
+                "has",
+                "like"
+              ],
+              "query": [
+                {
+                  "key": "bvid",
+                  "value": "{{bili_bvid}}"
+                }
+              ]
+            },
+            "description": "hasLikedRecentlyByBvid()/hasLikedRecentlyByAvid()。"
+          }
+        },
+        {
+          "name": "Has Liked Recently By AID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/web-interface/archive/has/like?aid={{bili_aid}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "web-interface",
+                "archive",
+                "has",
+                "like"
+              ],
+              "query": [
+                {
+                  "key": "aid",
+                  "value": "{{bili_aid}}"
+                }
+              ]
+            },
+            "description": "hasLikedRecentlyByAvid()。"
+          }
+        },
+        {
+          "name": "Created Favorite Folders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/v3/fav/folder/created/list-all?up_mid={{bili_mid}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "v3",
+                "fav",
+                "folder",
+                "created",
+                "list-all"
+              ],
+              "query": [
+                {
+                  "key": "up_mid",
+                  "value": "{{bili_mid}}"
+                }
+              ]
+            },
+            "description": "getUserCreatedFavFolders()。"
+          }
+        },
+        {
+          "name": "Favorite Folder Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/v3/fav/folder/info?media_id={{bili_media_id}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "v3",
+                "fav",
+                "folder",
+                "info"
+              ],
+              "query": [
+                {
+                  "key": "media_id",
+                  "value": "{{bili_media_id}}"
+                }
+              ]
+            },
+            "description": "getFavFolderInfo()。"
+          }
+        },
+        {
+          "name": "Favorite Folder Contents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/v3/fav/resource/list?media_id={{bili_media_id}}&pn=1&ps=20&order=mtime&platform=web",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "v3",
+                "fav",
+                "resource",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "media_id",
+                  "value": "{{bili_media_id}}"
+                },
+                {
+                  "key": "pn",
+                  "value": "1"
+                },
+                {
+                  "key": "ps",
+                  "value": "20"
+                },
+                {
+                  "key": "order",
+                  "value": "mtime"
+                },
+                {
+                  "key": "platform",
+                  "value": "web"
+                }
+              ]
+            },
+            "description": "getFavFolderContents()/getAllFavFolderItems()。"
+          }
+        },
+        {
+          "name": "Season Archives List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?mid={{bili_mid}}&season_id={{bili_season_id}}&page_num=1&page_size=30",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "polymer",
+                "web-space",
+                "seasons_archives_list"
+              ],
+              "query": [
+                {
+                  "key": "mid",
+                  "value": "{{bili_mid}}"
+                },
+                {
+                  "key": "season_id",
+                  "value": "{{bili_season_id}}"
+                },
+                {
+                  "key": "page_num",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "getAllSeasonArchives()。"
+          }
+        },
+        {
+          "name": "Video Page List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/player/pagelist?bvid={{bili_bvid}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "player",
+                "pagelist"
+              ],
+              "query": [
+                {
+                  "key": "bvid",
+                  "value": "{{bili_bvid}}"
+                }
+              ]
+            },
+            "description": "getVideoPageList(bvid)。"
+          }
+        },
+        {
+          "name": "Video Page List By AID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bili_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.bilibili.com"
+              }
+            ],
+            "url": {
+              "raw": "https://api.bilibili.com/x/player/pagelist?aid={{bili_aid}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "x",
+                "player",
+                "pagelist"
+              ],
+              "query": [
+                {
+                  "key": "aid",
+                  "value": "{{bili_aid}}"
+                }
+              ]
+            },
+            "description": "getVideoPageList(aid)。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search Metadata APIs",
+      "description": "来源: core/api/search 和 core/api/lyrics。",
+      "item": [
+        {
+          "name": "QQ Music Search",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://c.y.qq.com/soso/fcgi-bin/client_search_cp?format=json&n=20&p=1&w={{qq_keyword}}&cr=1&g_tk=5381",
+              "protocol": "https",
+              "host": [
+                "c",
+                "y",
+                "qq",
+                "com"
+              ],
+              "path": [
+                "soso",
+                "fcgi-bin",
+                "client_search_cp"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "n",
+                  "value": "20"
+                },
+                {
+                  "key": "p",
+                  "value": "1"
+                },
+                {
+                  "key": "w",
+                  "value": "{{qq_keyword}}"
+                },
+                {
+                  "key": "cr",
+                  "value": "1"
+                },
+                {
+                  "key": "g_tk",
+                  "value": "5381"
+                }
+              ]
+            },
+            "description": "QQMusicSearchApi.search()。"
+          }
+        },
+        {
+          "name": "QQ Music Song Detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://u.y.qq.com/cgi-bin/musicu.fcg?data={{qq_detail_data}}",
+              "protocol": "https",
+              "host": [
+                "u",
+                "y",
+                "qq",
+                "com"
+              ],
+              "path": [
+                "cgi-bin",
+                "musicu.fcg"
+              ],
+              "query": [
+                {
+                  "key": "data",
+                  "value": "{{qq_detail_data}}"
+                }
+              ]
+            },
+            "description": "QQMusicSearchApi.getSongInfo()。qq_detail_data 示例见环境变量。"
+          }
+        },
+        {
+          "name": "QQ Music Lyric",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://y.qq.com"
+              }
+            ],
+            "url": {
+              "raw": "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid={{qq_song_mid}}&format=json&inCharset=utf8&outCharset=utf-8&nobase64=1&g_tk=5381",
+              "protocol": "https",
+              "host": [
+                "c",
+                "y",
+                "qq",
+                "com"
+              ],
+              "path": [
+                "lyric",
+                "fcgi-bin",
+                "fcg_query_lyric_new.fcg"
+              ],
+              "query": [
+                {
+                  "key": "songmid",
+                  "value": "{{qq_song_mid}}"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "inCharset",
+                  "value": "utf8"
+                },
+                {
+                  "key": "outCharset",
+                  "value": "utf-8"
+                },
+                {
+                  "key": "nobase64",
+                  "value": "1"
+                },
+                {
+                  "key": "g_tk",
+                  "value": "5381"
+                }
+              ]
+            },
+            "description": "QQMusicSearchApi.fetchQQMusicLyric()。"
+          }
+        },
+        {
+          "name": "LRCLIB Get Lyrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "NeriPlayer/1.0 (https://github.com/cwuom/NeriPlayer)"
+              }
+            ],
+            "url": {
+              "raw": "https://lrclib.net/api/get?track_name={{lrclib_track_name}}&artist_name={{lrclib_artist_name}}&duration={{lrclib_duration_seconds}}",
+              "protocol": "https",
+              "host": [
+                "lrclib",
+                "net"
+              ],
+              "path": [
+                "api",
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "track_name",
+                  "value": "{{lrclib_track_name}}"
+                },
+                {
+                  "key": "artist_name",
+                  "value": "{{lrclib_artist_name}}"
+                },
+                {
+                  "key": "duration",
+                  "value": "{{lrclib_duration_seconds}}"
+                }
+              ]
+            },
+            "description": "LrcLibClient.getLyrics()。"
+          }
+        },
+        {
+          "name": "LRCLIB Search Lyrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "NeriPlayer/1.0 (https://github.com/cwuom/NeriPlayer)"
+              }
+            ],
+            "url": {
+              "raw": "https://lrclib.net/api/search?q={{lrclib_query}}",
+              "protocol": "https",
+              "host": [
+                "lrclib",
+                "net"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{lrclib_query}}"
+                }
+              ]
+            },
+            "description": "LrcLibClient.searchLyrics()。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "YouTube Music",
+      "description": "来源: core/api/youtube/YouTubeMusicClient.kt 和 YouTubeMusicPlaybackRepository.kt。先运行 Bootstrap / Fetch Music Home 提取 INNERTUBE_API_KEY、clientVersion、visitorData。",
+      "item": [
+        {
+          "name": "Bootstrap",
+          "item": [
+            {
+              "name": "Fetch Music Home",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const html = pm.response.text();",
+                      "function find(pattern) { const m = html.match(new RegExp(pattern)); return m ? m[1] : ''; }",
+                      "const apiKey = find('\"INNERTUBE_API_KEY\"\\\\s*:\\\\s*\"([^\"]+)\"') || find('\"innertubeApiKey\"\\\\s*:\\\\s*\"([^\"]+)\"');",
+                      "const clientVersion = find('\"INNERTUBE_CLIENT_VERSION\"\\\\s*:\\\\s*\"([^\"]+)\"') || find('\"INNERTUBE_CONTEXT_CLIENT_VERSION\"\\\\s*:\\\\s*\"([^\"]+)\"');",
+                      "const visitorData = find('\"VISITOR_DATA\"\\\\s*:\\\\s*\"([^\"]+)\"') || find('\"visitorData\"\\\\s*:\\\\s*\"([^\"]+)\"');",
+                      "if (apiKey) pm.environment.set('yt_api_key', apiKey);",
+                      "if (clientVersion) pm.environment.set('yt_client_version', clientVersion);",
+                      "if (visitorData) pm.environment.set('yt_visitor_data', visitorData);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Cookie",
+                    "value": "{{youtube_cookie}}"
+                  },
+                  {
+                    "key": "User-Agent",
+                    "value": "{{youtube_user_agent}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{youtube_accept_language}}"
+                  }
+                ],
+                "url": {
+                  "raw": "https://music.youtube.com/",
+                  "protocol": "https",
+                  "host": [
+                    "music",
+                    "youtube",
+                    "com"
+                  ]
+                },
+                "description": "bootstrap()。测试脚本会提取 yt_api_key/yt_client_version/yt_visitor_data。"
+              }
+            },
+            {
+              "name": "Fetch YouTube Web Home",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Cookie",
+                    "value": "{{youtube_cookie}}"
+                  },
+                  {
+                    "key": "User-Agent",
+                    "value": "{{youtube_user_agent}}"
+                  }
+                ],
+                "url": {
+                  "raw": "https://www.youtube.com/?themeRefresh=1",
+                  "protocol": "https",
+                  "host": [
+                    "www",
+                    "youtube",
+                    "com"
+                  ],
+                  "query": [
+                    {
+                      "key": "themeRefresh",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "YouTubeAuthAutoRefreshManager / WebPoTokenProvider 使用的页面。"
+              }
+            },
+            {
+              "name": "Fetch Player JS",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "User-Agent",
+                    "value": "{{youtube_user_agent}}"
+                  }
+                ],
+                "url": {
+                  "raw": "https://music.youtube.com/s/player/placeholder/base.js",
+                  "protocol": "https",
+                  "host": [
+                    "music",
+                    "youtube",
+                    "com"
+                  ],
+                  "path": [
+                    "s",
+                    "player",
+                    "placeholder",
+                    "base.js"
+                  ]
+                },
+                "description": "YouTubeMusicPlaybackRepository.fetchPlayerSignatureTimestamp()。"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Browse Home Feed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{youtube_authorization}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.youtube.com/"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-Goog-Visitor-Id",
+                "value": "{{yt_visitor_data}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "67"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{yt_client_version}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{youtube_accept_language}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"WEB_REMIX\",\n      \"clientVersion\": \"{{yt_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"utcOffsetMinutes\": 480,\n      \"userAgent\": \"{{youtube_user_agent}}\",\n      \"platform\": \"DESKTOP\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"browseId\": \"FEmusic_home\"\n}"
+            },
+            "url": {
+              "raw": "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "browse"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "getHomeFeed() / debugHomeFeedRaw()。"
+          }
+        },
+        {
+          "name": "Browse Library Playlists",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{youtube_authorization}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.youtube.com/"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "67"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{yt_client_version}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"WEB_REMIX\",\n      \"clientVersion\": \"{{yt_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"utcOffsetMinutes\": 480,\n      \"userAgent\": \"{{youtube_user_agent}}\",\n      \"platform\": \"DESKTOP\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"browseId\": \"FEmusic_liked_playlists\"\n}"
+            },
+            "url": {
+              "raw": "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "browse"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "getLibraryPlaylists()。"
+          }
+        },
+        {
+          "name": "Browse Playlist Detail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{youtube_authorization}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.youtube.com/"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "67"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{yt_client_version}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"WEB_REMIX\",\n      \"clientVersion\": \"{{yt_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"utcOffsetMinutes\": 480,\n      \"userAgent\": \"{{youtube_user_agent}}\",\n      \"platform\": \"DESKTOP\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"browseId\": \"{{yt_browse_id}}\"\n}"
+            },
+            "url": {
+              "raw": "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "browse"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "getPlaylistDetail()。yt_browse_id 示例: VL + playlistId。"
+          }
+        },
+        {
+          "name": "Search Songs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{youtube_authorization}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.youtube.com/"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-Goog-Visitor-Id",
+                "value": "{{yt_visitor_data}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "67"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{yt_client_version}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"WEB_REMIX\",\n      \"clientVersion\": \"{{yt_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"utcOffsetMinutes\": 480,\n      \"userAgent\": \"{{youtube_user_agent}}\",\n      \"platform\": \"DESKTOP\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"query\": \"{{yt_query}}\",\n  \"params\": \"EgWKAQIIAWoMEA4QChADEAQQCRAF\"\n}"
+            },
+            "url": {
+              "raw": "https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "search()。params 与源码 YouTubeMusicSearchParams.songs() 一致。"
+          }
+        },
+        {
+          "name": "Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{youtube_authorization}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.youtube.com/"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-Goog-Visitor-Id",
+                "value": "{{yt_visitor_data}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "67"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{yt_client_version}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"WEB_REMIX\",\n      \"clientVersion\": \"{{yt_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"utcOffsetMinutes\": 480,\n      \"userAgent\": \"{{youtube_user_agent}}\",\n      \"platform\": \"DESKTOP\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"videoId\": \"{{yt_video_id}}\",\n  \"contentCheckOk\": true,\n  \"racyCheckOk\": true\n}"
+            },
+            "url": {
+              "raw": "https://music.youtube.com/youtubei/v1/player?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "player"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "getPlayableAudio()/debugPlayerRaw()。"
+          }
+        },
+        {
+          "name": "Next For Lyrics Browse ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{youtube_authorization}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.youtube.com/"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "67"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{yt_client_version}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"WEB_REMIX\",\n      \"clientVersion\": \"{{yt_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"utcOffsetMinutes\": 480,\n      \"userAgent\": \"{{youtube_user_agent}}\",\n      \"platform\": \"DESKTOP\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"videoId\": \"{{yt_video_id}}\",\n  \"isAudioOnly\": true\n}"
+            },
+            "url": {
+              "raw": "https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "next"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "getLyrics() 第一步，解析返回 tabs 中 MPLYt 开头的 browseId。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "YouTube Playback / Probe Utilities",
+      "description": "来源: YouTubeMusicPlaybackRepository.kt、NewPipe 回退和 tools_pub/ytmusic_api_probe.py。用于播放器取流回退、探测以及已解析直链验证。",
+      "item": [
+        {
+          "name": "YouTube Watch Page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "url": {
+              "raw": "https://www.youtube.com/watch?v={{yt_video_id}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "watch"
+              ],
+              "query": [
+                {
+                  "key": "v",
+                  "value": "{{yt_video_id}}"
+                }
+              ]
+            },
+            "description": "resolvePlayableAudioViaNewPipe() 使用的 YouTube Web watch 页面入口。"
+          }
+        },
+        {
+          "name": "Music Watch Page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "url": {
+              "raw": "https://music.youtube.com/watch?v={{yt_video_id}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "watch"
+              ],
+              "query": [
+                {
+                  "key": "v",
+                  "value": "{{yt_video_id}}"
+                }
+              ]
+            },
+            "description": "ytmusic_api_probe.py / NowPlaying 分享 URL。"
+          }
+        },
+        {
+          "name": "Player Web Remix Official",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{youtube_authorization}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://music.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://music.youtube.com/watch?v={{yt_video_id}}&list=RDAMVM{{yt_video_id}}"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-Goog-Visitor-Id",
+                "value": "{{yt_visitor_data}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "67"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{yt_client_version}}"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{youtube_accept_language}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"WEB_REMIX\",\n      \"clientVersion\": \"{{yt_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"utcOffsetMinutes\": 480,\n      \"userAgent\": \"{{youtube_user_agent}}\",\n      \"platform\": \"DESKTOP\",\n      \"clientScreen\": \"WATCH\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"videoId\": \"{{yt_video_id}}\",\n  \"playlistId\": \"RDAMVM{{yt_video_id}}\",\n  \"contentCheckOk\": true,\n  \"racyCheckOk\": true,\n  \"playbackContext\": {\n    \"contentPlaybackContext\": {\n      \"html5Preference\": \"HTML5_PREF_WANTS\",\n      \"referer\": \"https://music.youtube.com/watch?v={{yt_video_id}}&list=RDAMVM{{yt_video_id}}\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "https://music.youtube.com/youtubei/v1/player?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "music",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "player"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "tools_pub/ytmusic_api_probe.py 的 HAR/official profile player 请求形态。"
+          }
+        },
+        {
+          "name": "Player TVHTML5 Fallback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://www.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://www.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.youtube.com/watch?v={{yt_video_id}}"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-Goog-Visitor-Id",
+                "value": "{{yt_visitor_data}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "7"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{youtube_tv_client_version}}"
+              },
+              {
+                "key": "X-Goog-Api-Format-Version",
+                "value": "2"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_tv_user_agent}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{youtube_accept_language}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"TVHTML5\",\n      \"clientVersion\": \"{{youtube_tv_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"platform\": \"TV\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"videoId\": \"{{yt_video_id}}\",\n  \"contentCheckOk\": true,\n  \"racyCheckOk\": true\n}"
+            },
+            "url": {
+              "raw": "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&id={{yt_video_id}}&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "youtube",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "player"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "id",
+                  "value": "{{yt_video_id}}"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "YouTubeMusicPlaybackRepository.playerClientProfiles() 中 TVHTML5/降级 TVHTML5 回退形态。"
+          }
+        },
+        {
+          "name": "Player Google APIs Base",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{youtube_cookie}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "https://www.youtube.com"
+              },
+              {
+                "key": "X-Origin",
+                "value": "https://www.youtube.com"
+              },
+              {
+                "key": "Referer",
+                "value": "https://www.youtube.com/watch?v={{yt_video_id}}"
+              },
+              {
+                "key": "X-Goog-AuthUser",
+                "value": "{{youtube_auth_user}}"
+              },
+              {
+                "key": "X-Goog-Visitor-Id",
+                "value": "{{yt_visitor_data}}"
+              },
+              {
+                "key": "X-YouTube-Client-Name",
+                "value": "7"
+              },
+              {
+                "key": "X-YouTube-Client-Version",
+                "value": "{{youtube_tv_client_version}}"
+              },
+              {
+                "key": "X-Goog-Api-Format-Version",
+                "value": "2"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_tv_user_agent}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{youtube_accept_language}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"client\": {\n      \"clientName\": \"TVHTML5\",\n      \"clientVersion\": \"{{youtube_tv_client_version}}\",\n      \"hl\": \"{{youtube_hl}}\",\n      \"gl\": \"{{youtube_gl}}\",\n      \"visitorData\": \"{{yt_visitor_data}}\",\n      \"platform\": \"TV\"\n    },\n    \"user\": {\n      \"lockedSafetyMode\": false\n    }\n  },\n  \"videoId\": \"{{yt_video_id}}\",\n  \"contentCheckOk\": true,\n  \"racyCheckOk\": true\n}"
+            },
+            "url": {
+              "raw": "https://youtubei.googleapis.com/youtubei/v1/player?prettyPrint=false&key={{yt_api_key}}",
+              "protocol": "https",
+              "host": [
+                "youtubei",
+                "googleapis",
+                "com"
+              ],
+              "path": [
+                "youtubei",
+                "v1",
+                "player"
+              ],
+              "query": [
+                {
+                  "key": "prettyPrint",
+                  "value": "false"
+                },
+                {
+                  "key": "key",
+                  "value": "{{yt_api_key}}"
+                }
+              ]
+            },
+            "description": "tools_pub/ytmusic_api_probe.py 中记录的 YOUTUBEI_API_BASE 直连入口。"
+          }
+        },
+        {
+          "name": "Resolved Googlevideo Audio Range Probe",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Range",
+                "value": "bytes=0-1023"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "url": {
+              "raw": "https://rr1---sn-placeholder.googlevideo.com/videoplayback",
+              "protocol": "https",
+              "host": [
+                "rr1---sn-placeholder",
+                "googlevideo",
+                "com"
+              ],
+              "path": [
+                "videoplayback"
+              ]
+            },
+            "description": "对播放器返回的 googlevideo.com/videoplayback 直链做 Range 探测；URL 来自 player 响应 streamingData。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth / Web Login Utilities",
+      "description": "来源: WebLogin Activity、YouTubeAuthAutoRefreshManager 和 SettingsGitHubDialogs。它们是浏览器授权/网页登录入口，不是 JSON 数据 API，但属于仓库显式调用的外部接口。",
+      "item": [
+        {
+          "name": "NetEase Web Login",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "{{netease_mobile_user_agent}}"
+              }
+            ],
+            "url": {
+              "raw": "https://y.music.163.com/m/login",
+              "protocol": "https",
+              "host": [
+                "y",
+                "music",
+                "163",
+                "com"
+              ],
+              "path": [
+                "m",
+                "login"
+              ]
+            },
+            "description": "NeteaseWebLoginActivity.TARGET_URL。登录后读取 music.163.com / interface*.music.163.com Cookie。"
+          }
+        },
+        {
+          "name": "Bilibili Web Login",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "{{bili_user_agent}}"
+              }
+            ],
+            "url": {
+              "raw": "https://passport.bilibili.com/login",
+              "protocol": "https",
+              "host": [
+                "passport",
+                "bilibili",
+                "com"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "BiliWebLoginActivity.LOGIN_URL。登录后读取 SESSDATA、bili_jct、DedeUserID 等 Cookie。"
+          }
+        },
+        {
+          "name": "YouTube Google Service Login",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "{{youtube_user_agent}}"
+              }
+            ],
+            "url": {
+              "raw": "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F",
+              "protocol": "https",
+              "host": [
+                "accounts",
+                "google",
+                "com"
+              ],
+              "path": [
+                "ServiceLogin"
+              ],
+              "query": [
+                {
+                  "key": "service",
+                  "value": "youtube"
+                },
+                {
+                  "key": "continue",
+                  "value": "https://music.youtube.com/"
+                }
+              ]
+            },
+            "description": "YouTubeWebLoginActivity.TARGET_URL / YouTubeAuthAutoRefreshManager 刷新登录入口。"
+          }
+        },
+        {
+          "name": "GitHub Token Creation Page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "{{github_user_agent}}"
+              }
+            ],
+            "url": {
+              "raw": "https://github.com/settings/tokens/new?scopes=repo&description=NeriPlayer%20Backup",
+              "protocol": "https",
+              "host": [
+                "github",
+                "com"
+              ],
+              "path": [
+                "settings",
+                "tokens",
+                "new"
+              ],
+              "query": [
+                {
+                  "key": "scopes",
+                  "value": "repo"
+                },
+                {
+                  "key": "description",
+                  "value": "NeriPlayer Backup"
+                }
+              ]
+            },
+            "description": "SettingsGitHubDialogs 中打开的 GitHub token 创建页面，repo scope 用于 GitHub Sync。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "GitHub Sync",
+      "description": "来源: app/src/main/java/moe/ouom/neriplayer/data/sync/github/GitHubApiClient.kt",
+      "item": [
+        {
+          "name": "Validate Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{github_token}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/vnd.github+json"
+              }
+            ],
+            "url": {
+              "raw": "https://api.github.com/user",
+              "protocol": "https",
+              "host": [
+                "api",
+                "github",
+                "com"
+              ],
+              "path": [
+                "user"
+              ]
+            },
+            "description": "validateToken()。"
+          }
+        },
+        {
+          "name": "Create Repository",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{github_token}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/vnd.github+json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{github_repo}}\",\n  \"description\": \"NeriPlayer backup data\",\n  \"private\": true,\n  \"auto_init\": true\n}"
+            },
+            "url": {
+              "raw": "https://api.github.com/user/repos",
+              "protocol": "https",
+              "host": [
+                "api",
+                "github",
+                "com"
+              ],
+              "path": [
+                "user",
+                "repos"
+              ]
+            },
+            "description": "createRepository()。"
+          }
+        },
+        {
+          "name": "Check Repository",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{github_token}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/vnd.github+json"
+              }
+            ],
+            "url": {
+              "raw": "https://api.github.com/repos/{{github_owner}}/{{github_repo}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "github",
+                "com"
+              ],
+              "path": [
+                "repos",
+                "{{github_owner}}",
+                "{{github_repo}}"
+              ]
+            },
+            "description": "checkRepository()。"
+          }
+        },
+        {
+          "name": "Get Sync File Content",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const json = pm.response.json(); if (json.sha) pm.environment.set('github_sha', json.sha); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{github_token}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/vnd.github+json"
+              }
+            ],
+            "url": {
+              "raw": "https://api.github.com/repos/{{github_owner}}/{{github_repo}}/contents/{{github_path}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "github",
+                "com"
+              ],
+              "path": [
+                "repos",
+                "{{github_owner}}",
+                "{{github_repo}}",
+                "contents",
+                "{{github_path}}"
+              ]
+            },
+            "description": "getFileContent()/getFileContentStrict()。响应 content 为 Base64。"
+          }
+        },
+        {
+          "name": "Update Sync File Content",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{github_token}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/vnd.github+json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Update backup data\",\n  \"content\": \"{{github_content_base64}}\",\n  \"sha\": \"{{github_sha}}\",\n  \"branch\": \"{{github_branch}}\"\n}"
+            },
+            "url": {
+              "raw": "https://api.github.com/repos/{{github_owner}}/{{github_repo}}/contents/{{github_path}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "github",
+                "com"
+              ],
+              "path": [
+                "repos",
+                "{{github_owner}}",
+                "{{github_repo}}",
+                "contents",
+                "{{github_path}}"
+              ]
+            },
+            "description": "updateFileContent()。content 需是 Base64 编码后的 SyncData JSON。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebDAV Sync",
+      "description": "来源: app/src/main/java/moe/ouom/neriplayer/data/sync/webdav/WebDavApiClient.kt。remoteUrl 形如 serverUrl/basePath/neriplayer-sync.json。",
+      "item": [
+        {
+          "name": "Validate / Read Remote File",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{webdav_username}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{webdav_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://example.com/dav/neriplayer-sync.json",
+              "protocol": "https",
+              "host": [
+                "example",
+                "com"
+              ],
+              "path": [
+                "dav",
+                "neriplayer-sync.json"
+              ]
+            },
+            "description": "validateConnection()/getFileContentStrict()。200 表示存在，404 对 validateConnection 也算可连接。"
+          }
+        },
+        {
+          "name": "Update Remote File",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{webdav_username}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{webdav_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{sync_data_json}}"
+            },
+            "url": {
+              "raw": "https://example.com/dav/neriplayer-sync.json",
+              "protocol": "https",
+              "host": [
+                "example",
+                "com"
+              ],
+              "path": [
+                "dav",
+                "neriplayer-sync.json"
+              ]
+            },
+            "description": "updateFileContent()。"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "listen_together_base_url",
+      "value": "https://neriplayer.hancat.work",
+      "type": "string"
+    },
+    {
+      "key": "listen_together_ws_url",
+      "value": "wss://neriplayer.hancat.work",
+      "type": "string"
+    },
+    {
+      "key": "lt_ws_url",
+      "value": "wss://neriplayer.hancat.work/api/rooms/{{lt_room_id}}/ws?token={{lt_token}}",
+      "type": "string"
+    },
+    {
+      "key": "webdav_remote_file_url",
+      "value": "https://example.com/dav/neriplayer-sync.json",
+      "type": "string"
+    },
+    {
+      "key": "youtube_player_js_url",
+      "value": "https://music.youtube.com/s/player/placeholder/base.js",
+      "type": "string"
+    },
+    {
+      "key": "youtube_audio_url",
+      "value": "https://rr1---sn-placeholder.googlevideo.com/videoplayback",
+      "type": "string"
+    },
+    {
+      "key": "netease_music_base_url",
+      "value": "https://music.163.com",
+      "type": "string"
+    },
+    {
+      "key": "netease_interface_base_url",
+      "value": "https://interface.music.163.com",
+      "type": "string"
+    },
+    {
+      "key": "netease_interface3_base_url",
+      "value": "https://interface3.music.163.com",
+      "type": "string"
+    },
+    {
+      "key": "bili_api_base_url",
+      "value": "https://api.bilibili.com",
+      "type": "string"
+    },
+    {
+      "key": "youtube_music_base_url",
+      "value": "https://music.youtube.com",
+      "type": "string"
+    },
+    {
+      "key": "youtube_web_base_url",
+      "value": "https://www.youtube.com",
+      "type": "string"
+    },
+    {
+      "key": "youtubei_googleapis_base_url",
+      "value": "https://youtubei.googleapis.com",
+      "type": "string"
+    },
+    {
+      "key": "github_api_base_url",
+      "value": "https://api.github.com",
+      "type": "string"
+    },
+    {
+      "key": "qq_c_base_url",
+      "value": "https://c.y.qq.com",
+      "type": "string"
+    },
+    {
+      "key": "qq_u_base_url",
+      "value": "https://u.y.qq.com",
+      "type": "string"
+    },
+    {
+      "key": "lrclib_base_url",
+      "value": "https://lrclib.net",
+      "type": "string"
+    }
+  ]
+}
