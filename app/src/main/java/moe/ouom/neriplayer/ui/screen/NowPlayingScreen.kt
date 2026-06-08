@@ -278,12 +278,17 @@ private const val CoverSourceBadgeRevealBufferMs = 120
 private const val CoverSourceBadgeRevealDelayMs =
     LyricsPageTransitionDurationMs + CoverSourceBadgeRevealBufferMs
 private const val NowPlayingPortraitContentWidthFraction = 0.97f
+private const val QueueSheetMaxHeightFraction = 0.9f
 private val LyricOffsetStepMsFloat = LYRIC_DEFAULT_OFFSET_STEP_MS.toFloat()
 
 internal fun shouldHideDownloadActionForSong(
     hasLocalDownload: Boolean,
     currentTask: moe.ouom.neriplayer.core.download.DownloadTask?
 ): Boolean = shouldHideRemoteDownloadAction(hasLocalDownload, currentTask)
+
+internal fun buildNowPlayingQueueItemKey(index: Int, song: SongItem): String {
+    return "$index:${song.stableKey()}"
+}
 
 private fun hasCachedLocalDownload(song: SongItem): Boolean {
     return GlobalDownloadManager.hasDownloadedSongCached(song) ||
@@ -446,7 +451,7 @@ fun NowPlayingScreen(
     var showQualitySwitchDialog by remember { mutableStateOf(false) }
     var playbackModeToast by remember { mutableStateOf<Toast?>(null) }
     val addSheetState = rememberModalBottomSheetState()
-    val queueSheetState = rememberModalBottomSheetState()
+    val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Snackbar状态
     val snackbarHostState = remember { SnackbarHostState() }
@@ -1408,11 +1413,14 @@ fun NowPlayingScreen(
                 ) {
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier.bottomSheetScrollGuard()
+                        modifier = Modifier
+                            .fillMaxHeight(QueueSheetMaxHeightFraction)
+                            .bottomSheetScrollGuard()
+                            .windowInsetsPadding(WindowInsets.navigationBars)
                     ) {
                         itemsIndexed(
                             items = displayedQueue,
-                            key = { _, song -> song.stableKey() },
+                            key = ::buildNowPlayingQueueItemKey,
                             contentType = { _, _ -> "queue_song" }
                         ) { index, song ->
                             Row(
