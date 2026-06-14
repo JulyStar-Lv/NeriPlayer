@@ -701,7 +701,7 @@ internal fun SettingsBackupRestoreSection(
         }
 
         if (showConfigExportWarningDialog) {
-            MiuixSettingsDialog(
+            AlertDialog(
                 onDismissRequest = { showConfigExportWarningDialog = false },
                 icon = {
                     Icon(
@@ -713,7 +713,7 @@ internal fun SettingsBackupRestoreSection(
                 title = { Text(stringResource(R.string.settings_config_export_warning_title)) },
                 text = { Text(stringResource(R.string.settings_config_export_warning_message)) },
                 confirmButton = {
-                    MiuixSettingsTextButton(
+                    HapticTextButton(
                         onClick = {
                             showConfigExportWarningDialog = false
                             onExportConfigClick()
@@ -723,7 +723,7 @@ internal fun SettingsBackupRestoreSection(
                     }
                 },
                 dismissButton = {
-                    MiuixSettingsTextButton(
+                    HapticTextButton(
                         onClick = { showConfigExportWarningDialog = false }
                     ) {
                         Text(stringResource(R.string.action_cancel))
