@@ -129,8 +129,7 @@ internal class ConfigSettingsSanitizer(private val context: Context) {
                 return@forEach
             }
             val normalized = when (name) {
-                SettingsKeys.CLOUD_MUSIC_LYRIC_DEFAULT_OFFSET_MS.name,
-                SettingsKeys.QQ_MUSIC_LYRIC_DEFAULT_OFFSET_MS.name ->
+                SettingsKeys.LYRIC_DEFAULT_OFFSET_MS.name ->
                     normalizeLyricDefaultOffsetMs(value)
                 SettingsKeys.PLAYBACK_FADE_IN_DURATION_MS.name,
                 SettingsKeys.PLAYBACK_FADE_OUT_DURATION_MS.name,
@@ -215,12 +214,6 @@ internal class ConfigSettingsSanitizer(private val context: Context) {
             onAdjusted,
             ::normalizeThemeColorPalette
         )
-        sanitizeStringValue(strings, SettingsKeys.THEME_PALETTE_STYLE.name, onAdjusted) {
-            ThemeDefaults.normalizePaletteStyle(it)
-        }
-        sanitizeStringValue(strings, SettingsKeys.THEME_COLOR_SPEC.name, onAdjusted) {
-            ThemeDefaults.normalizeColorSpec(it)
-        }
     }
 
     private fun sanitizeBackgroundImageUri(
