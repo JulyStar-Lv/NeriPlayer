@@ -12,8 +12,8 @@ package moe.ouom.neriplayer
  *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this software.
@@ -52,7 +52,12 @@ class NeriPlayerApplication : Application() {
         // 初始化语言设置
         LanguageManager.init(this)
         val enterSafeMode = SafeModeManager.shouldEnterSafeMode(this)
-        ExceptionHandler.init(this, installNativeCrashHandler = !enterSafeMode)
+
+        // Do not install a process-wide native signal handler here. ART uses SIGSEGV and
+        // related signals internally for JIT compilation and runtime checks. Intercepting
+        // those signals from application code can break Android's libsigchain, especially
+        // on vendor-modified ART builds. JVM crash logging and safe mode remain enabled.
+        ExceptionHandler.init(this, installNativeCrashHandler = false)
 
         if (enterSafeMode) {
             return
