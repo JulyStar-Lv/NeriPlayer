@@ -92,6 +92,9 @@
 -dontwarn com.google.api.client.http.**
 -dontwarn org.joda.time.**
 
+# SLF4J 可选日志绑定 - Ktor JVM 依赖 slf4j-api，Android 端未打包绑定实现
+-dontwarn org.slf4j.impl.StaticLoggerBinder
+
 # GitHub 同步数据模型 - 确保Gson序列化正常
 -keep class moe.ouom.neriplayer.data.github.** { *; }
 -keepclassmembers class moe.ouom.neriplayer.data.github.** {
