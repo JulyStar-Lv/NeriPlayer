@@ -84,6 +84,7 @@ data class SongItem(
     val matchedTranslatedLyric: String? = null,
     val matchedLyricSource: MusicPlatform? = null,
     val matchedSongId: String? = null,
+    val matchedAlbum: String? = null,
     val userLyricOffsetMs: Long = 0L,
     val customCoverUrl: String? = null,
     val customName: String? = null,

@@ -2,56 +2,10 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel target="17">
-      <module name="NeriPlayer.buildSrc" target="21" />
-      <module name="NeriPlayer.buildSrc.main" target="21" />
-      <module name="NeriPlayer.buildSrc.test" target="21" />
+      <module name="NeriPlayer.music-metadata" target="21" />
       <module name="TuneDock.buildSrc" target="21" />
       <module name="TuneDock.buildSrc.main" target="21" />
       <module name="TuneDock.buildSrc.test" target="21" />
-    </bytecodeTargetLevel>
-    <bytecodeTargetLevel target="17">
-      <module name="NeriPlayer.composeApp" target="21" />
-      <module name="NeriPlayer.composeApp.jvmMain" target="21" />
-      <module name="NeriPlayer.composeApp.jvmTest" target="21" />
-      <module name="NeriPlayer.core.data" target="21" />
-      <module name="NeriPlayer.core.data.jvmMain" target="21" />
-      <module name="NeriPlayer.core.data.jvmTest" target="21" />
-      <module name="NeriPlayer.core.domain" target="21" />
-      <module name="NeriPlayer.core.domain.jvmMain" target="21" />
-      <module name="NeriPlayer.core.domain.jvmTest" target="21" />
-      <module name="NeriPlayer.core.playback" target="21" />
-      <module name="NeriPlayer.core.playback.jvmMain" target="21" />
-      <module name="NeriPlayer.core.playback.jvmTest" target="21" />
-      <module name="NeriPlayer.core.presentation" target="21" />
-      <module name="NeriPlayer.core.presentation.jvmMain" target="21" />
-      <module name="NeriPlayer.core.presentation.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.library.data" target="21" />
-      <module name="NeriPlayer.feature.library.data.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.library.data.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.library.domain" target="21" />
-      <module name="NeriPlayer.feature.library.domain.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.library.domain.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.library.presentation" target="21" />
-      <module name="NeriPlayer.feature.library.presentation.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.library.presentation.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.player.data" target="21" />
-      <module name="NeriPlayer.feature.player.data.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.player.data.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.player.domain" target="21" />
-      <module name="NeriPlayer.feature.player.domain.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.player.domain.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.player.presentation" target="21" />
-      <module name="NeriPlayer.feature.player.presentation.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.player.presentation.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.sources.data" target="21" />
-      <module name="NeriPlayer.feature.sources.data.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.sources.data.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.sources.domain" target="21" />
-      <module name="NeriPlayer.feature.sources.domain.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.sources.domain.jvmTest" target="21" />
-      <module name="NeriPlayer.feature.sources.presentation" target="21" />
-      <module name="NeriPlayer.feature.sources.presentation.jvmMain" target="21" />
-      <module name="NeriPlayer.feature.sources.presentation.jvmTest" target="21" />
     </bytecodeTargetLevel>
   </component>
 </project>

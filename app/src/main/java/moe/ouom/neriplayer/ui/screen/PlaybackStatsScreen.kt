@@ -501,7 +501,8 @@ private fun TrackStat.toSongItem(): SongItem = SongItem(
     localFileName = localFileName,
     customName = customName,
     customArtist = customArtist,
-    customCoverUrl = customCoverUrl
+    customCoverUrl = customCoverUrl,
+    matchedAlbum = matchedAlbum
 )
 
 private fun formatListenDuration(ms: Long): String {

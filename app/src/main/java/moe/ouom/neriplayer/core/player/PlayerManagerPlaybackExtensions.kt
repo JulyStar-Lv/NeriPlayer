@@ -15,7 +15,11 @@ import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.core.api.bili.BiliClient
 import moe.ouom.neriplayer.core.api.bili.buildBiliPartSong
 import moe.ouom.neriplayer.core.player.debug.playbackStateName
-import moe.ouom.neriplayer.core.player.metadata.shouldAutoMatchExternalLyrics
+import moe.ouom.neriplayer.core.player.metadata.applyAutoSearchMetadata
+import moe.ouom.neriplayer.core.player.metadata.isBiliMetadataSource
+import moe.ouom.neriplayer.core.player.metadata.shouldAutoMatchExternalMetadata
+import moe.ouom.neriplayer.core.player.metadata.shouldAutoSearchMetadataForMissingLyrics
+import moe.ouom.neriplayer.core.player.metadata.toMetadataSearchQueries
 import moe.ouom.neriplayer.core.player.model.PlayerEvent
 import moe.ouom.neriplayer.core.player.model.SongUrlResult
 import moe.ouom.neriplayer.core.player.policy.PlaybackFailureAdvanceAction
@@ -376,6 +380,8 @@ internal fun PlayerManager.playAtIndex(
     }
 
     playJob?.cancel()
+    currentMetadataAutoSearchJob?.cancel()
+    currentMetadataAutoSearchJob = null
     currentYouTubePrefetchJob?.cancel()
     currentYouTubePrefetchJob = null
     playbackRequestToken += 1
@@ -484,7 +490,7 @@ internal fun PlayerManager.playAtIndex(
                     return@launch
                 }
                 maybeWarmNextYouTubeMusicAfterCurrentResolved()
-                maybeAutoMatchYouTubeMusicLyrics(song, requestToken)
+                maybeAutoMatchMetadata(song, requestToken)
             }
             SongUrlResult.WaitingForAuthoritativeStream -> {
                 NPLogger.d(
@@ -537,22 +543,58 @@ internal fun PlayerManager.enterPendingMediaLoad(requestedPositionMs: Long) {
     _playbackPositionMs.value = action.positionMs
 }
 
-private fun PlayerManager.maybeAutoMatchYouTubeMusicLyrics(song: SongItem, requestToken: Long) {
-    if (!shouldAutoMatchExternalLyrics(song, isYouTubeMusicTrack(song))) return
-    ioScope.launch {
+private fun PlayerManager.maybeAutoMatchMetadata(song: SongItem, requestToken: Long) {
+    val localSong = isLocalSong(song)
+    val biliSong = song.isBiliMetadataSource(BILI_SOURCE_TAG)
+    val shouldLoadMissingLyrics = shouldAutoSearchMetadataForMissingLyrics(
+        song = song,
+        isLocalSong = localSong,
+        isBiliSong = biliSong
+    )
+    val shouldMatchExternalMetadata = shouldAutoMatchExternalMetadata(
+        song = song,
+        isLocalSong = localSong,
+        isBiliSong = biliSong
+    )
+    if (!shouldLoadMissingLyrics && !shouldMatchExternalMetadata) {
+        return
+    }
+
+    currentMetadataAutoSearchJob?.cancel()
+    currentMetadataAutoSearchJob = ioScope.launch {
         val currentSong = _currentSongFlow.value ?: return@launch
         if (requestToken != playbackRequestToken || !currentSong.sameIdentityAs(song)) {
             return@launch
         }
 
-        val candidate =
-            SearchManager.findBestSearchCandidate(song.name, song.artist) ?: return@launch
+        val searchQueries = currentSong.toMetadataSearchQueries(isBiliSong = biliSong)
+        val match = if (shouldLoadMissingLyrics) {
+            SearchManager.findFirstSongDetails(
+                searchQueries = searchQueries,
+                requireLyrics = true
+            )
+        } else {
+            SearchManager.findBestSongDetails(
+                searchQueries = searchQueries
+            )
+        } ?: return@launch
         val latestSong = _currentSongFlow.value ?: return@launch
         if (requestToken != playbackRequestToken || !latestSong.sameIdentityAs(song)) {
             return@launch
         }
 
-        replaceMetadataFromSearch(latestSong, candidate, isAuto = true)
+        val updatedSong = applyAutoSearchMetadata(
+            originalSong = latestSong,
+            songName = match.details.songName,
+            singer = match.details.singer,
+            coverUrl = match.details.coverUrl,
+            album = match.details.album,
+            lyric = match.details.lyric,
+            translatedLyric = match.details.translatedLyric,
+            matchedSource = match.candidate.source,
+            matchedSongId = match.candidate.id
+        )
+        updateSongInAllPlaces(latestSong, updatedSong)
     }
 }
 

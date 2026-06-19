@@ -1,5 +1,6 @@
 package moe.ouom.neriplayer.core.player.metadata
 
+import moe.ouom.neriplayer.core.api.search.MetadataSearchQuery
 import moe.ouom.neriplayer.core.api.search.MusicPlatform
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 import org.junit.Assert.assertEquals
@@ -100,49 +101,266 @@ class PlayerManagerSearchMetadataTest {
     }
 
     @Test
-    fun `auto lyric matching is allowed only for unmatched youtube music songs`() {
-        val song = SongItem(
+    fun `auto metadata replacement rewrites base metadata and lyrics`() {
+        val originalSong = SongItem(
             id = 4L,
-            name = "标题",
-            artist = "歌手",
-            album = "YouTube Music",
-            albumId = 0L,
+            name = "旧标题",
+            artist = "旧歌手",
+            album = "Netease旧专辑",
+            albumId = 10L,
             durationMs = 1000L,
-            coverUrl = null
+            coverUrl = "old-cover"
         )
 
-        assertTrue(shouldAutoMatchExternalLyrics(song, isYouTubeMusicTrack = true))
-        assertFalse(shouldAutoMatchExternalLyrics(song, isYouTubeMusicTrack = false))
+        val updatedSong = applyAutoSearchMetadata(
+            originalSong = originalSong,
+            songName = "新标题",
+            singer = "新歌手",
+            coverUrl = "new-cover",
+            lyric = "[00:00.00]歌词",
+            translatedLyric = "[00:00.00]译文",
+            matchedSource = MusicPlatform.CLOUD_MUSIC,
+            matchedSongId = "456"
+        )
+
+        assertEquals("新标题", updatedSong.name)
+        assertEquals("新歌手", updatedSong.artist)
+        assertEquals("new-cover", updatedSong.coverUrl)
+        assertEquals("[00:00.00]歌词", updatedSong.matchedLyric)
+        assertEquals("[00:00.00]译文", updatedSong.matchedTranslatedLyric)
+        assertEquals("456", updatedSong.matchedSongId)
+        assertEquals("旧标题", updatedSong.originalName)
+        assertEquals("旧歌手", updatedSong.originalArtist)
+        assertEquals("old-cover", updatedSong.originalCoverUrl)
     }
 
     @Test
-    fun `auto lyric matching skips songs with existing or custom metadata`() {
+    fun `auto metadata matching is allowed for unmatched remote songs`() {
         val song = SongItem(
             id = 5L,
             name = "标题",
             artist = "歌手",
-            album = "YouTube Music",
+            album = "Netease专辑",
+            albumId = 0L,
+            durationMs = 1000L,
+            coverUrl = null
+        )
+
+        assertTrue(
+            shouldAutoMatchExternalMetadata(
+                song = song,
+                isLocalSong = false,
+                isBiliSong = false
+            )
+        )
+        assertFalse(
+            shouldAutoMatchExternalMetadata(
+                song = song,
+                isLocalSong = true,
+                isBiliSong = false
+            )
+        )
+        assertFalse(
+            shouldAutoMatchExternalMetadata(
+                song = song,
+                isLocalSong = false,
+                isBiliSong = true
+            )
+        )
+    }
+
+    @Test
+    fun `metadata lyrics fallback is allowed for local and bili songs without lyrics`() {
+        val song = SongItem(
+            id = 7L,
+            name = "标题",
+            artist = "歌手",
+            album = "Netease专辑",
             albumId = 0L,
             durationMs = 1000L,
             coverUrl = null
         )
 
         assertFalse(
-            shouldAutoMatchExternalLyrics(
-                song.copy(matchedLyric = "[00:00.00]已有歌词"),
-                isYouTubeMusicTrack = true
+            shouldAutoSearchMetadataForMissingLyrics(
+                song = song,
+                isLocalSong = false,
+                isBiliSong = false
+            )
+        )
+        assertTrue(
+            shouldAutoSearchMetadataForMissingLyrics(
+                song = song,
+                isLocalSong = true,
+                isBiliSong = false
+            )
+        )
+        assertTrue(
+            shouldAutoSearchMetadataForMissingLyrics(
+                song = song,
+                isLocalSong = false,
+                isBiliSong = true
+            )
+        )
+    }
+
+    @Test
+    fun `bili metadata source can be detected from channel id`() {
+        val song = SongItem(
+            id = 8L,
+            name = "标题",
+            artist = "歌手",
+            album = "External album",
+            albumId = 0L,
+            durationMs = 1000L,
+            coverUrl = null,
+            channelId = "bilibili",
+            audioId = "av123"
+        )
+
+        val isBiliSong = song.isBiliMetadataSource("Bilibili")
+
+        assertTrue(isBiliSong)
+        assertTrue(
+            shouldAutoSearchMetadataForMissingLyrics(
+                song = song,
+                isLocalSong = false,
+                isBiliSong = isBiliSong
             )
         )
         assertFalse(
-            shouldAutoMatchExternalLyrics(
-                song.copy(matchedSongId = "123"),
-                isYouTubeMusicTrack = true
+            shouldAutoMatchExternalMetadata(
+                song = song,
+                isLocalSong = false,
+                isBiliSong = isBiliSong
+            )
+        )
+    }
+
+    @Test
+    fun `bili metadata queries ignore uploader and include both title artist orders`() {
+        val song = SongItem(
+            id = 9L,
+            name = "G.E.M. 邓紫棋 - 唯一",
+            artist = "Uploader Name",
+            album = "Bilibili|123",
+            albumId = 0L,
+            durationMs = 266_000L,
+            coverUrl = null,
+            channelId = "bilibili",
+            audioId = "av123",
+            subAudioId = "123"
+        )
+
+        val queries = song.toMetadataSearchQueries(isBiliSong = true)
+
+        assertTrue(
+            MetadataSearchQuery(
+                songName = "唯一",
+                songArtist = "G.E.M. 邓紫棋",
+                durationMs = 266_000L
+            ) in queries
+        )
+        assertTrue(
+            MetadataSearchQuery(
+                songName = "G.E.M. 邓紫棋",
+                songArtist = "唯一",
+                durationMs = 266_000L
+            ) in queries
+        )
+        assertTrue(queries.none { it.songArtist == "Uploader Name" })
+    }
+
+    @Test
+    fun `bili metadata queries keep whole title fallback without uploader`() {
+        val queries = buildBiliMetadataSearchQueries(
+            title = "01. 唯一现场版",
+            durationMs = 266_000L
+        )
+
+        assertEquals(
+            listOf(
+                MetadataSearchQuery(
+                    songName = "唯一现场版",
+                    songArtist = "",
+                    durationMs = 266_000L
+                )
+            ),
+            queries
+        )
+    }
+
+    @Test
+    fun `bili metadata queries do not split latin hyphenated title`() {
+        val queries = buildBiliMetadataSearchQueries(
+            title = "Anti-Hero",
+            durationMs = 200_000L
+        )
+
+        assertEquals(
+            listOf(
+                MetadataSearchQuery(
+                    songName = "Anti-Hero",
+                    songArtist = "",
+                    durationMs = 200_000L
+                )
+            ),
+            queries
+        )
+    }
+
+    @Test
+    fun `auto metadata matching skips songs with existing or custom metadata`() {
+        val song = SongItem(
+            id = 6L,
+            name = "标题",
+            artist = "歌手",
+            album = "Netease专辑",
+            albumId = 0L,
+            durationMs = 1000L,
+            coverUrl = null
+        )
+
+        assertFalse(
+            shouldAutoMatchExternalMetadata(
+                song = song.copy(matchedLyric = "[00:00.00]已有歌词"),
+                isLocalSong = false,
+                isBiliSong = false
             )
         )
         assertFalse(
-            shouldAutoMatchExternalLyrics(
-                song.copy(customName = "手动标题"),
-                isYouTubeMusicTrack = true
+            shouldAutoMatchExternalMetadata(
+                song = song.copy(matchedSongId = "123"),
+                isLocalSong = false,
+                isBiliSong = false
+            )
+        )
+        assertFalse(
+            shouldAutoMatchExternalMetadata(
+                song = song.copy(customName = "手动标题"),
+                isLocalSong = false,
+                isBiliSong = false
+            )
+        )
+        assertFalse(
+            shouldAutoSearchMetadataForMissingLyrics(
+                song = song.copy(matchedLyric = "[00:00.00]已有歌词"),
+                isLocalSong = true,
+                isBiliSong = false
+            )
+        )
+        assertFalse(
+            shouldAutoSearchMetadataForMissingLyrics(
+                song = song.copy(originalLyric = "[00:00.00]旧歌词"),
+                isLocalSong = false,
+                isBiliSong = true
+            )
+        )
+        assertFalse(
+            shouldAutoSearchMetadataForMissingLyrics(
+                song = song.copy(customName = "手动标题"),
+                isLocalSong = true,
+                isBiliSong = false
             )
         )
     }

@@ -24,7 +24,8 @@ internal object SyncPlaybackStatMapper {
             durationMs = stat.durationMs,
             mediaUri = LocalSongSupport.sanitizeMediaUriForSync(stat.mediaUri),
             id = stat.id,
-            albumId = stat.albumId
+            albumId = stat.albumId,
+            matchedAlbum = stat.matchedAlbum
         )
     }
 
@@ -60,6 +61,7 @@ internal object SyncPlaybackStatMapper {
             a.durationMs == b.durationMs &&
             a.mediaUri == b.mediaUri &&
             a.id == b.id &&
-            a.albumId == b.albumId
+            a.albumId == b.albumId &&
+            a.matchedAlbum == b.matchedAlbum
     }
 }

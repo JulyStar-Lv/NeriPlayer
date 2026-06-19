@@ -97,6 +97,9 @@
     <string name="settings_config_importing">Importing config file…</string>
     <string name="settings_config_export_success">Config export successful</string>
     <string name="settings_config_export_failed">Config export failed</string>
+    <string name="settings_config_export_warning_title">Before exporting config</string>
+    <string name="settings_config_export_warning_message">The config file includes sign-in credentials, auth cookies, tokens, and sync configuration. Use it only for personal migration and never share it with anyone.</string>
+    <string name="settings_config_export_warning_confirm">I understand, export</string>
     <string name="settings_config_import_success">Config import complete</string>
     <string name="settings_config_import_failed">Config import failed</string>
     <string name="settings_config_import_restored_settings">Restored %1$d app settings</string>
@@ -108,6 +111,7 @@
     <string name="config_import_warning_netease_cookie">NetEase sign-in data did not pass validation and was skipped</string>
     <string name="config_import_warning_background_image">Custom background image access is unavailable and was skipped</string>
     <string name="config_import_warning_download_directory">Download directory access is unavailable and was skipped</string>
+    <string name="config_import_warning_invalid_setting_values">Some settings were unknown or invalid and were skipped or restored to a safe range</string>
     <string name="playlist_backup_date">Backup date: %s</string>
     <string name="playlist_analyzing">Analyzing differences…</string>
     <string name="playlist_analysis_failed">Analysis failed: %s</string>
@@ -406,6 +410,8 @@
     <string name="quality_netease_default">NetEase Default Quality</string>
     <string name="quality_bili_default">Bilibili Default Quality</string>
     <string name="quality_youtube_default">YouTube Default Quality</string>
+    <string name="settings_audio_quality_netease_member_quality_notice">If you do not have a membership, switching to lossless or higher quality may cause songs to fail playback.</string>
+    <string name="settings_audio_quality_bili_dolby_notice">The highest quality profile may cause songs to fail parsing unless the song natively supports Dolby.</string>
 
     <!-- Playback Device -->
     <string name="device_speaker">Speaker</string>
@@ -655,6 +661,29 @@
     <string name="startup_crash_report_title_native">Detected previous native crash</string>
     <string name="startup_crash_report_desc">The app crashed during the previous launch. A preview of the crash log is shown below.\nLog file: %1$s</string>
     <string name="startup_crash_report_truncated">The log is long, so only the first 64 KB is shown here. You can copy the full content or export the original file.</string>
+    <string name="safe_mode_title">Safe Mode</string>
+    <string name="safe_mode_subtitle">A crash was detected from the previous launch, so all app components were skipped.</string>
+    <string name="safe_mode_component_lock">Only log viewing, log export, Cookie cleanup, sign-in reset, settings reset, and normal startup recovery are available.</string>
+    <string name="safe_mode_log_preview">Crash log preview</string>
+    <string name="safe_mode_log_file">Log file: %1$s</string>
+    <string name="safe_mode_log_empty">No crash log is available</string>
+    <string name="safe_mode_copy_log">Copy log</string>
+    <string name="safe_mode_export_log">Export log</string>
+    <string name="safe_mode_reset_login">Clear Cookies and reset sign-ins</string>
+    <string name="safe_mode_reset_login_desc">Clears WebView Cookies and the local NetEase, Bili, and YouTube sign-in states.</string>
+    <string name="safe_mode_reset_login_confirm_title">Reset sign-in state?</string>
+    <string name="safe_mode_reset_login_confirm_message">This will clear saved Cookies and web sign-in storage on this device. You will need to sign in again.</string>
+    <string name="safe_mode_reset_login_done">Cookies and sign-in states were reset</string>
+    <string name="safe_mode_reset_login_failed">Reset failed: %1$s</string>
+    <string name="safe_mode_reset_settings">Reset all settings</string>
+    <string name="safe_mode_reset_settings_desc">Restores all app settings to defaults without clearing sign-ins or Cookies.</string>
+    <string name="safe_mode_reset_settings_confirm_title">Reset all settings?</string>
+    <string name="safe_mode_reset_settings_confirm_message">This will clear saved app settings and rebuild startup snapshots. Sign-ins, Cookies, and account data will not be cleared.</string>
+    <string name="safe_mode_reset_settings_done">All settings were reset</string>
+    <string name="safe_mode_reset_settings_failed">Settings reset failed: %1$s</string>
+    <string name="safe_mode_restore_normal">Restore normal startup</string>
+    <string name="safe_mode_restore_normal_desc">Clears this crash marker and enters the full app again. If the issue still exists, safe mode will open again next time.</string>
+    <string name="safe_mode_restore_failed">Restore failed: %1$s</string>
 
     <!-- Errors -->
     <string name="error_network">Network Error</string>
@@ -1379,6 +1408,13 @@
     <string name="library_bili_folder_load_failed">Load failed: %1$s</string>
     <string name="library_bili_folder_empty">No videos found in this folder</string>
     <string name="library_bili_collection">Video</string>
+    <string name="library_bili_remove_video">Remove</string>
+    <string name="library_bili_remove_video_confirm">Remove "%1$s" from this folder?</string>
+    <string name="library_bili_remove_video_success">Removed</string>
+    <string name="library_bili_remove_video_failed">Remove failed: %1$s</string>
+    <string name="library_bili_remove_invalid_videos">Remove invalid videos</string>
+    <string name="library_bili_remove_invalid_videos_confirm">Remove %1$d invalid videos from this group?</string>
+    <string name="library_bili_remove_invalid_videos_failed">Failed to remove invalid videos: %1$s</string>
     <string name="library_platform_accounts">Platform Accounts</string>
     <string name="library_platform_accounts_desc">Connect platforms and the library will load playlists, favorites, and albums automatically</string>
     <string name="library_platform_login">Sign in</string>
@@ -1388,6 +1424,8 @@
     <string name="library_source_import_empty">No importable playlists loaded yet</string>
     <string name="library_source_import_apply">Save Selection (%1$d)</string>
     <string name="library_source_import_updated">Imported playlists updated</string>
+    <string name="library_source_remove_saved">Unsave</string>
+    <string name="library_source_remove_saved_success">Removed "%1$s" from Library</string>
     <string name="library_platform_import_playlists">%1$s Imported Playlists</string>
     <string name="library_platform_manage_source_empty_hint">Manage sources to choose the playlists shown here</string>
     <string name="library_platform_connect_platform">Connect %1$s</string>

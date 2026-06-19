@@ -124,7 +124,8 @@ data class SyncSong(
     @ProtoNumber(23) val channelId: String? = null,
     @ProtoNumber(24) val audioId: String? = null,
     @ProtoNumber(25) val subAudioId: String? = null,
-    @ProtoNumber(26) val playlistContextId: String? = null
+    @ProtoNumber(26) val playlistContextId: String? = null,
+    @ProtoNumber(27) val matchedAlbum: String? = null
 ) {
     companion object {
         fun fromSongItemOrNull(song: SongItem, context: Context? = null): SyncSong? {
@@ -154,6 +155,7 @@ data class SyncSong(
                 matchedTranslatedLyric = song.matchedTranslatedLyric,
                 matchedLyricSource = song.matchedLyricSource?.name,
                 matchedSongId = song.matchedSongId,
+                matchedAlbum = song.matchedAlbum,
                 userLyricOffsetMs = song.userLyricOffsetMs,
                 customCoverUrl = syncCustomCoverUrl,
                 customName = song.customName,
@@ -187,6 +189,7 @@ data class SyncSong(
                 try { MusicPlatform.valueOf(it) } catch (e: Exception) { null }
             },
             matchedSongId = matchedSongId,
+            matchedAlbum = matchedAlbum,
             userLyricOffsetMs = userLyricOffsetMs,
             customCoverUrl = customCoverUrl,
             customName = customName,
@@ -417,5 +420,6 @@ data class SyncTrackStat(
     @ProtoNumber(10) val durationMs: Long = 0L,
     @ProtoNumber(11) val mediaUri: String? = null,
     @ProtoNumber(12) val id: Long = 0L,
-    @ProtoNumber(13) val albumId: Long = 0L
+    @ProtoNumber(13) val albumId: Long = 0L,
+    @ProtoNumber(14) val matchedAlbum: String? = null
 )

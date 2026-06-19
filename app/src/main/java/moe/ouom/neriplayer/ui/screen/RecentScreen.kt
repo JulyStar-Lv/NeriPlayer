@@ -99,7 +99,6 @@ import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.core.download.GlobalDownloadManager
 import moe.ouom.neriplayer.core.player.PlayerManager
-import moe.ouom.neriplayer.data.local.media.isLocalSong
 import moe.ouom.neriplayer.data.local.media.displayAlbum
 import moe.ouom.neriplayer.data.model.displayArtist
 import moe.ouom.neriplayer.data.model.displayCoverUrl
@@ -110,7 +109,6 @@ import moe.ouom.neriplayer.ui.LocalMiniPlayerHeight
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 import moe.ouom.neriplayer.util.HapticIconButton
 import moe.ouom.neriplayer.util.HapticTextButton
-import moe.ouom.neriplayer.util.formatDuration
 import moe.ouom.neriplayer.util.offlineCachedImageRequest
 import moe.ouom.neriplayer.util.performHapticFeedback
 import kotlin.random.Random
@@ -456,22 +454,10 @@ private fun RecentRowRich(
     val ctx = LocalContext.current
     val coverUrl = song.displayCoverUrl(ctx)
     val primaryTitle = remember(song) {
-        if (song.isLocalSong()) {
-            song.localFileName?.takeIf { it.isNotBlank() } ?: song.displayName()
-        } else {
-            song.displayName()
-        }
+        song.displayName()
     }
-    val secondaryText = remember(song) {
-        buildList {
-            if (song.isLocalSong()) {
-                song.displayName()
-                    .takeIf { it.isNotBlank() && it != primaryTitle }
-                    ?.let(::add)
-            }
-            song.displayArtist().takeIf { it.isNotBlank() }?.let(::add)
-            add(formatDuration(song.durationMs))
-        }.joinToString(" · ")
+    val secondaryText = remember(song, ctx) {
+        song.recentSongSubtitle(ctx)
     }
     val rowScale by animateFloatAsState(
         targetValue = if (isCurrentSong) 1.01f else 1f,
@@ -579,6 +565,25 @@ private fun RecentRowRich(
         // 右侧更多
         moreMenu()
     }
+}
+
+private fun SongItem.recentSongSubtitle(context: android.content.Context): String {
+    return listOfNotNull(
+        displayArtist().trim().takeIf { it.isNotBlank() },
+        displayAlbum(context).toRecentDisplayAlbum()
+    ).joinToString(" · ")
+}
+
+private fun String.toRecentDisplayAlbum(): String? {
+    val normalized = trim()
+    if (normalized.isBlank()) return null
+    if (normalized.equals("Bilibili", ignoreCase = true)) return null
+    if (normalized.startsWith("Bilibili|", ignoreCase = true)) return null
+    if (normalized.equals("Netease", ignoreCase = true)) return null
+    if (normalized.startsWith("Netease", ignoreCase = true)) {
+        return normalized.removePrefix("Netease").trim().takeIf { it.isNotBlank() }
+    }
+    return normalized
 }
 
 

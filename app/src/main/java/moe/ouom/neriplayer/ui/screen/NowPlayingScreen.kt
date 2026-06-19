@@ -205,6 +205,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.ouom.neriplayer.R
 import moe.ouom.neriplayer.core.api.search.MusicPlatform
+import moe.ouom.neriplayer.core.api.search.SearchLyricsType
 import moe.ouom.neriplayer.core.api.search.SongSearchInfo
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.core.download.DownloadStatus
@@ -278,12 +279,17 @@ private const val CoverSourceBadgeRevealBufferMs = 120
 private const val CoverSourceBadgeRevealDelayMs =
     LyricsPageTransitionDurationMs + CoverSourceBadgeRevealBufferMs
 private const val NowPlayingPortraitContentWidthFraction = 0.97f
+private const val QueueSheetMaxHeightFraction = 0.9f
 private val LyricOffsetStepMsFloat = LYRIC_DEFAULT_OFFSET_STEP_MS.toFloat()
 
 internal fun shouldHideDownloadActionForSong(
     hasLocalDownload: Boolean,
     currentTask: moe.ouom.neriplayer.core.download.DownloadTask?
 ): Boolean = shouldHideRemoteDownloadAction(hasLocalDownload, currentTask)
+
+internal fun buildNowPlayingQueueItemKey(index: Int, song: SongItem): String {
+    return "$index:${song.stableKey()}"
+}
 
 private fun hasCachedLocalDownload(song: SongItem): Boolean {
     return GlobalDownloadManager.hasDownloadedSongCached(song) ||
@@ -446,7 +452,7 @@ fun NowPlayingScreen(
     var showQualitySwitchDialog by remember { mutableStateOf(false) }
     var playbackModeToast by remember { mutableStateOf<Toast?>(null) }
     val addSheetState = rememberModalBottomSheetState()
-    val queueSheetState = rememberModalBottomSheetState()
+    val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Snackbar状态
     val snackbarHostState = remember { SnackbarHostState() }
@@ -519,14 +525,15 @@ fun NowPlayingScreen(
     // 内容的进入动画
     var contentVisible by remember { mutableStateOf(false) }
 
-    var lyrics by remember(currentSong?.id) { mutableStateOf<List<LyricEntry>>(emptyList()) }
-    var translatedLyrics by remember(currentSong?.id) { mutableStateOf<List<LyricEntry>>(emptyList()) }
-    var rawLyricsText by remember(currentSong?.id) { mutableStateOf<String?>(null) }
-    var rawTranslatedLyricsText by remember(currentSong?.id) { mutableStateOf<String?>(null) }
+    val currentSongStableKey = currentSong?.stableKey()
+    var lyrics by remember(currentSongStableKey) { mutableStateOf<List<LyricEntry>>(emptyList()) }
+    var translatedLyrics by remember(currentSongStableKey) { mutableStateOf<List<LyricEntry>>(emptyList()) }
+    var rawLyricsText by remember(currentSongStableKey) { mutableStateOf<String?>(null) }
+    var rawTranslatedLyricsText by remember(currentSongStableKey) { mutableStateOf<String?>(null) }
     val nowPlayingViewModel: NowPlayingViewModel = viewModel()
 
     LaunchedEffect(
-        currentSong?.id,
+        currentSongStableKey,
         currentSong?.matchedLyric,
         currentSong?.matchedTranslatedLyric,
         currentSong?.originalLyric,
@@ -610,10 +617,10 @@ fun NowPlayingScreen(
         lyrics = loadedLyricsState.lyrics
         translatedLyrics = loadedLyricsState.translatedLyrics
     }
-    var previewPositionOverrideMs by remember(currentSong?.id) { mutableStateOf<Long?>(null) }
+    var previewPositionOverrideMs by remember(currentSongStableKey) { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(Unit) { contentVisible = true }
-    LaunchedEffect(currentSong?.id) { showQualitySwitchDialog = false }
+    LaunchedEffect(currentSongStableKey) { showQualitySwitchDialog = false }
     DisposableEffect(Unit) {
         onDispose {
             playbackModeToast?.cancel()
@@ -1408,11 +1415,14 @@ fun NowPlayingScreen(
                 ) {
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier.bottomSheetScrollGuard()
+                        modifier = Modifier
+                            .fillMaxHeight(QueueSheetMaxHeightFraction)
+                            .bottomSheetScrollGuard()
+                            .windowInsetsPadding(WindowInsets.navigationBars)
                     ) {
                         itemsIndexed(
                             items = displayedQueue,
-                            key = { _, song -> song.stableKey() },
+                            key = ::buildNowPlayingQueueItemKey,
                             contentType = { _, _ -> "queue_song" }
                         ) { index, song ->
                             Row(
@@ -1646,7 +1656,7 @@ fun MoreOptionsSheet(
 
     LaunchedEffect(showSearchView) {
         if (showSearchView) {
-            viewModel.prepareForSearch(originalSong.name)
+            viewModel.prepareForSearch(originalSong.name, originalSong.durationMs)
             viewModel.performSearch()
             if (autoShowKeyboard) {
                 delay(120)
@@ -2068,21 +2078,6 @@ fun MoreOptionsSheet(
                             }),
                         )
 
-                        // 平台切换
-                        androidx.compose.material3.PrimaryTabRow(
-                            selectedTabIndex = searchState.selectedPlatform.ordinal,
-                            containerColor = Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.primary
-                        ) {
-                            MusicPlatform.entries.forEachIndexed { index, platform ->
-                                Tab(
-                                    selected = searchState.selectedPlatform.ordinal == index,
-                                    onClick = { viewModel.selectPlatform(platform) },
-                                    text = { Text(platform.name.replace("_", " ")) }
-                                )
-                            }
-                        }
-
                         // 搜索结果区域
                         Box(Modifier.height(300.dp)) {
                             if (searchState.isLoading) {
@@ -2097,13 +2092,21 @@ fun MoreOptionsSheet(
                                     items(
                                         items = searchState.searchResults,
                                         key = { songResult ->
-                                            "${songResult.source.name}:${songResult.id}"
+                                            "${songResult.providerId ?: songResult.source.name}:${songResult.id}"
                                         },
                                         contentType = { "search_result" }
                                     ) { songResult ->
                                         ListItem(
-                                            headlineContent = { Text(songResult.songName, maxLines = 1) },
-                                            supportingContent = { Text(songResult.singer, maxLines = 1) },
+                                            headlineContent = {
+                                                Text(
+                                                    text = songResult.titleWithArtist(),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            supportingContent = {
+                                                SearchResultTagContent(songResult)
+                                            },
                                             leadingContent = {
                                                 val context = LocalContext.current
                                                 AsyncImage(
@@ -2472,7 +2475,7 @@ fun EditSongInfoSheet(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.prepareForSearch(originalSong.name)
+        viewModel.prepareForSearch(originalSong.name, originalSong.durationMs)
     }
 
     fun applyOriginalInfo(
@@ -2745,7 +2748,7 @@ fun EditSongInfoSheet(
         ) {
             HapticTextButton(
                 onClick = {
-                    viewModel.prepareForSearch(songName)
+                    viewModel.prepareForSearch(songName, actualSong.durationMs)
                     viewModel.performSearch()
                     showSearchResults = true
                     focusManager.clearFocus()
@@ -2964,21 +2967,6 @@ fun EditSongInfoSheet(
                     })
                 )
 
-                // 平台切换
-                androidx.compose.material3.PrimaryTabRow(
-                    selectedTabIndex = searchState.selectedPlatform.ordinal,
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    MusicPlatform.entries.forEachIndexed { index, platform ->
-                        Tab(
-                            selected = searchState.selectedPlatform.ordinal == index,
-                            onClick = { viewModel.selectPlatform(platform) },
-                            text = { Text(platform.name.replace("_", " ")) }
-                        )
-                    }
-                }
-
                 // 搜索结果列表
                 Box(
                     modifier = Modifier
@@ -2996,7 +2984,7 @@ fun EditSongInfoSheet(
                             items(
                                 items = searchState.searchResults,
                                 key = { songResult ->
-                                    "${songResult.source.name}:${songResult.id}"
+                                    "${songResult.providerId ?: songResult.source.name}:${songResult.id}"
                                 },
                                 contentType = { "search_result" }
                             ) { songResult ->
@@ -3015,8 +3003,16 @@ fun EditSongInfoSheet(
                                         colors = androidx.compose.material3.ListItemDefaults.colors(
                                             containerColor = Color.Transparent
                                         ),
-                                        headlineContent = { Text(songResult.songName, maxLines = 1) },
-                                        supportingContent = { Text(songResult.singer, maxLines = 1) },
+                                        headlineContent = {
+                                            Text(
+                                                text = songResult.titleWithArtist(),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        supportingContent = {
+                                            SearchResultTagContent(songResult)
+                                        },
                                         leadingContent = {
                                             AsyncImage(
                                                 model = offlineCachedImageRequest(
@@ -3046,6 +3042,86 @@ fun EditSongInfoSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SearchResultTagContent(songResult: SongSearchInfo) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SearchResultTag(text = songResult.providerDisplayName())
+        SearchResultTag(
+            text = songResult.lyricsType.displayName(),
+            emphasized = songResult.lyricsType == SearchLyricsType.WORD
+        )
+    }
+}
+
+@Composable
+private fun SearchResultTag(
+    text: String,
+    emphasized: Boolean = false
+) {
+    val containerColor = if (emphasized) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
+    }
+    val contentColor = if (emphasized) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = containerColor,
+        contentColor = contentColor
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun SongSearchInfo.providerDisplayName(): String {
+    val provider = providerId?.trim()
+    return when (provider?.lowercase()) {
+        "netease" -> "网易云"
+        "qq" -> "QQ音乐"
+        "kugou" -> "酷狗"
+        "soda" -> "汽水音乐"
+        "applemusic" -> "Apple Music"
+        "lrclib" -> "LRCLIB"
+        null, "" -> when (source) {
+            MusicPlatform.CLOUD_MUSIC -> "网易云"
+            MusicPlatform.QQ_MUSIC -> "QQ音乐"
+        }
+        else -> provider
+    }
+}
+
+private fun SongSearchInfo.titleWithArtist(): String {
+    val title = songName.trim()
+    val artist = singer.trim()
+    return when {
+        title.isBlank() -> artist
+        artist.isBlank() -> title
+        else -> "$title - $artist"
+    }
+}
+
+private fun SearchLyricsType.displayName(): String {
+    return when (this) {
+        SearchLyricsType.WORD -> "逐字歌词"
+        SearchLyricsType.LINE -> "逐行歌词"
+        SearchLyricsType.NONE -> "无歌词"
     }
 }
 

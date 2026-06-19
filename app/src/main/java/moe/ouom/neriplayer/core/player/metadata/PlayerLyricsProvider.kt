@@ -259,7 +259,7 @@ internal object PlayerLyricsProvider {
                 return@withContext emptyList()
             }
 
-            if (song.album.startsWith(biliSourceTag)) {
+            if (song.isBiliMetadataSource(biliSourceTag)) {
                 return@withContext when (song.matchedLyricSource) {
                     MusicPlatform.CLOUD_MUSIC -> {
                         val matchedId = song.matchedSongId?.toLongOrNull()
@@ -324,7 +324,7 @@ internal object PlayerLyricsProvider {
             }
 
             when {
-                song.album.startsWith(biliSourceTag) -> emptyList()
+                song.isBiliMetadataSource(biliSourceTag) -> emptyList()
                 else -> getNeteaseLyrics(song.id, neteaseClient, neteaseLyricsCache)
             }
         }

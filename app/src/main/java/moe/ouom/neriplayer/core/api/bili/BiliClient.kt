@@ -36,6 +36,7 @@ import moe.ouom.neriplayer.data.auth.bili.BiliCookieRepository
 import moe.ouom.neriplayer.data.platform.bili.prioritizeBiliStreamUrls
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -81,6 +82,7 @@ class BiliClient(
         private const val FAV_FOLDER_CREATED_LIST_ALL = "https://api.bilibili.com/x/v3/fav/folder/created/list-all"
         private const val FAV_FOLDER_INFO = "https://api.bilibili.com/x/v3/fav/folder/info"
         private const val FAV_RESOURCE_LIST = "https://api.bilibili.com/x/v3/fav/resource/list"
+        private const val FAV_RESOURCE_DEAL = "https://api.bilibili.com/x/v3/fav/resource/deal"
         private const val SEASON_ARCHIVES_LIST = "https://api.bilibili.com/x/polymer/web-space/seasons_archives_list"
         private const val PAGELIST_URL = "https://api.bilibili.com/x/player/pagelist"
 
@@ -710,6 +712,23 @@ class BiliClient(
         pageResults.sortedBy { it.first }.flatMap { it.second }
     }
 
+    suspend fun removeVideoFromFavFolder(mediaId: Long, aid: Long): Unit =
+        removeResourceFromFavFolder(mediaId = mediaId, rid = aid, type = 2)
+
+    suspend fun removeResourceFromFavFolder(mediaId: Long, rid: Long, type: Int): Unit =
+        withContext(Dispatchers.IO) {
+            val params = mapOf(
+                "rid" to rid.toString(),
+                "type" to type.toString(),
+                "del_media_ids" to mediaId.toString()
+            )
+            val jo = postFormJson(FAV_RESOURCE_DEAL, params)
+            val code = jo.optInt("code", -1)
+            if (code != 0) {
+                throw IOException("removeResourceFromFavFolder failed: code=$code, message=${jo.optString("message")}")
+            }
+        }
+
     private fun JSONObject.optBiliPageCount(): Int {
         val directCount = listOf("page", "pages", "page_count", "videos")
             .firstNotNullOfOrNull { key -> optInt(key, 0).takeIf { it > 0 } }
@@ -920,6 +939,27 @@ class BiliClient(
         params.forEach { (k, v) -> builder.addQueryParameter(k, v) }
         val url = builder.build()
         val text = executeGetAsText(url)
+        return JSONObject(text)
+    }
+
+    private suspend fun postFormJson(baseUrl: String, params: Map<String, String>): JSONObject {
+        val cookies = getEffectiveCookies()
+        val csrf = cookies["bili_jct"].orEmpty()
+        if (csrf.isBlank()) {
+            throw IOException("Missing Bilibili csrf token")
+        }
+        val body = FormBody.Builder().apply {
+            params.forEach { (k, v) -> add(k, v) }
+            add("csrf", csrf)
+        }.build()
+        val req = Request.Builder()
+            .url(baseUrl)
+            .header("User-Agent", DEFAULT_WEB_UA)
+            .header("Referer", REFERER)
+            .apply { headerCookieIfPresent(cookies.toCookieHeader()) }
+            .post(body)
+            .build()
+        val text = http.newCall(req).executeOrThrow().use { it.body?.string().orEmpty() }
         return JSONObject(text)
     }
 

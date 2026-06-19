@@ -14,6 +14,7 @@ internal fun PlayedEntry.toSongItem(): SongItem = SongItem(
     mediaUri = localFilePath ?: mediaUri,
     matchedLyric = matchedLyric,
     matchedTranslatedLyric = matchedTranslatedLyric,
+    matchedAlbum = matchedAlbum,
     customCoverUrl = customCoverUrl,
     customName = customName,
     customArtist = customArtist,

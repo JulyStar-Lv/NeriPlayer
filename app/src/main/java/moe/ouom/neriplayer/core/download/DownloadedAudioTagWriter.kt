@@ -94,7 +94,7 @@ internal object DownloadedAudioTagWriter {
 
         putSingleValue(propertyMap, "TITLE", song.displayName())
         putSingleValue(propertyMap, "ARTIST", song.artist)
-        putSingleValue(propertyMap, "ALBUM", song.album)
+        putSingleValue(propertyMap, "ALBUM", song.matchedAlbum ?: song.album)
         putSingleValue(propertyMap, "ALBUMARTIST", song.artist)
         putSingleValue(propertyMap, "TRACKNUMBER", song.id.takeIf { it > 0L }?.toString())
         putPrimaryLyricValues(propertyMap, audioExtension, embeddedLyric)

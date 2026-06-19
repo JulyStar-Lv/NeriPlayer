@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.ouom.neriplayer.core.api.bili.resolveBiliSong
-import moe.ouom.neriplayer.core.api.search.MusicPlatform
 import moe.ouom.neriplayer.core.api.search.SongSearchInfo
 import moe.ouom.neriplayer.core.player.PlayerManager
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
@@ -44,10 +43,10 @@ import moe.ouom.neriplayer.R
 
 data class ManualSearchState(
     val keyword: String = "",
-    val selectedPlatform: MusicPlatform = MusicPlatform.CLOUD_MUSIC,
     val searchResults: List<SongSearchInfo> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val durationMs: Long? = null
 )
 
 class NowPlayingViewModel : ViewModel() {
@@ -55,12 +54,13 @@ class NowPlayingViewModel : ViewModel() {
     private val _manualSearchState = MutableStateFlow(ManualSearchState())
     val manualSearchState = _manualSearchState.asStateFlow()
 
-    fun prepareForSearch(initialKeyword: String) {
+    fun prepareForSearch(initialKeyword: String, durationMs: Long? = null) {
         _manualSearchState.update {
             it.copy(
                 keyword = initialKeyword,
                 searchResults = emptyList(), // 清空上次结果
-                error = null
+                error = null,
+                durationMs = durationMs?.takeIf { value -> value > 0L }
             )
         }
     }
@@ -69,20 +69,16 @@ class NowPlayingViewModel : ViewModel() {
         _manualSearchState.update { it.copy(keyword = newKeyword) }
     }
 
-    fun selectPlatform(platform: MusicPlatform) {
-        _manualSearchState.update { it.copy(selectedPlatform = platform) }
-        performSearch()
-    }
-
     fun performSearch() {
-        if (_manualSearchState.value.keyword.isBlank()) return
+        val request = _manualSearchState.value
+        if (request.keyword.isBlank()) return
 
         viewModelScope.launch {
             _manualSearchState.update { it.copy(isLoading = true, error = null) }
             try {
                 val results = SearchManager.search(
-                    keyword = _manualSearchState.value.keyword,
-                    platform = _manualSearchState.value.selectedPlatform,
+                    keyword = request.keyword,
+                    durationMs = request.durationMs,
                 )
                 _manualSearchState.update { it.copy(isLoading = false, searchResults = results) }
 
@@ -148,16 +144,7 @@ class NowPlayingViewModel : ViewModel() {
     fun fillLyrics(context: Context, song: SongItem, selectedSong: SongSearchInfo, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {
-                val platform = selectedSong.source
-                val api = when (platform) {
-                    MusicPlatform.CLOUD_MUSIC -> {
-                        val client = AppContainer.neteaseClient
-                        moe.ouom.neriplayer.core.api.search.CloudMusicSearchApi(client)
-                    }
-                    MusicPlatform.QQ_MUSIC -> moe.ouom.neriplayer.core.api.search.QQMusicSearchApi()
-                }
-
-                val songDetails = api.getSongInfo(selectedSong.id)
+                val songDetails = SearchManager.getSongInfo(selectedSong)
 
                 if (!songDetails.lyric.isNullOrBlank()) {
                     // 一次性更新歌词和翻译歌词，避免数据竞争

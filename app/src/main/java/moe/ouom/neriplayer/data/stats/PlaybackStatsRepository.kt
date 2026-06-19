@@ -39,6 +39,7 @@ data class TrackStat(
     val customName: String?,
     val customArtist: String?,
     val customCoverUrl: String?,
+    val matchedAlbum: String? = null,
     val identityKey: String
 )
 
@@ -149,9 +150,12 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
             val key = song.stableKey()
             val current = _stats.value
             val existingIndex = current.indexOfFirst { it.identityKey == key }
+            val existing = current.getOrNull(existingIndex)
+            val shouldStartNewStatsEpoch = existing?.let {
+                shouldStartNewStatsEpoch(it, _statsClearedAt.value)
+            } == true
 
-            val updated = if (existingIndex >= 0) {
-                val existing = current[existingIndex]
+            val updated = if (existing != null && !shouldStartNewStatsEpoch) {
                 val newTotalMs = existing.totalListenMs + listenedMs.coerceAtLeast(0L)
                 val countIncrement = playCountIncrement ?: calculatePlayCountIncrement(
                     existing = existing,
@@ -174,32 +178,25 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                         localFileName = song.localFileName,
                         customName = song.customName,
                         customArtist = song.customArtist,
-                        customCoverUrl = song.customCoverUrl
+                        customCoverUrl = song.customCoverUrl,
+                        matchedAlbum = song.matchedAlbum
                     )
                 }
             } else {
-                val countIncrement = playCountIncrement
-                    ?: if (listenedMs >= MIN_LISTEN_MS_FOR_PLAY_COUNT) 1 else 0
-                current + TrackStat(
-                    id = song.id,
-                    name = song.name,
-                    artist = song.artist,
-                    album = song.album,
-                    albumId = song.albumId,
-                    coverUrl = song.coverUrl,
-                    durationMs = song.durationMs,
-                    totalListenMs = listenedMs.coerceAtLeast(0L),
-                    playCount = countIncrement,
-                    lastPlayedAt = now,
-                    firstPlayedAt = now,
-                    mediaUri = song.mediaUri,
-                    localFilePath = song.localFilePath,
-                    localFileName = song.localFileName,
-                    customName = song.customName,
-                    customArtist = song.customArtist,
-                    customCoverUrl = song.customCoverUrl,
-                    identityKey = key
+                val freshStat = createTrackStat(
+                    song = song,
+                    listenedMs = listenedMs,
+                    playCountIncrement = playCountIncrement,
+                    now = now,
+                    key = key
                 )
+                if (existingIndex >= 0) {
+                    current.toMutableList().apply {
+                        this[existingIndex] = freshStat
+                    }
+                } else {
+                    current + freshStat
+                }
             }
 
             _stats.value = updated
@@ -208,6 +205,38 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                 triggerSync()
             }
         }
+    }
+
+    private fun createTrackStat(
+        song: SongItem,
+        listenedMs: Long,
+        playCountIncrement: Int?,
+        now: Long,
+        key: String
+    ): TrackStat {
+        val countIncrement = playCountIncrement
+            ?: if (listenedMs >= MIN_LISTEN_MS_FOR_PLAY_COUNT) 1 else 0
+        return TrackStat(
+            id = song.id,
+            name = song.name,
+            artist = song.artist,
+            album = song.album,
+            albumId = song.albumId,
+            coverUrl = song.coverUrl,
+            durationMs = song.durationMs,
+            totalListenMs = listenedMs.coerceAtLeast(0L),
+            playCount = countIncrement,
+            lastPlayedAt = now,
+            firstPlayedAt = now,
+            mediaUri = song.mediaUri,
+            localFilePath = song.localFilePath,
+            localFileName = song.localFileName,
+            customName = song.customName,
+            customArtist = song.customArtist,
+            customCoverUrl = song.customCoverUrl,
+            matchedAlbum = song.matchedAlbum,
+            identityKey = key
+        )
     }
 
     private fun calculatePlayCountIncrement(
@@ -267,7 +296,12 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                     .filter { shouldKeepLocalAfterClear(it, effectiveClearedAt) }
                     .associateBy { it.identityKey }
                     .toMutableMap()
-                for (remote in syncStats.filter { SyncPlaybackStatsMergePolicy.shouldKeepAfterClear(it, effectiveClearedAt) }) {
+                val normalizedRemoteStats = SyncPlaybackStatsMergePolicy.merge(
+                    local = emptyList(),
+                    remote = syncStats,
+                    playbackStatsClearedAt = effectiveClearedAt
+                )
+                for (remote in normalizedRemoteStats) {
                     val local = current[remote.identityKey]
                     if (local == null) {
                         current[remote.identityKey] = TrackStat(
@@ -288,6 +322,7 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                             customName = null,
                             customArtist = null,
                             customCoverUrl = null,
+                            matchedAlbum = remote.matchedAlbum,
                             identityKey = remote.identityKey
                         )
                     } else {
@@ -298,7 +333,8 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                             firstPlayedAt = minOf(local.firstPlayedAt, remote.firstPlayedAt),
                             name = if (remote.lastPlayedAt > local.lastPlayedAt) remote.name else local.name,
                             artist = if (remote.lastPlayedAt > local.lastPlayedAt) remote.artist else local.artist,
-                            coverUrl = if (remote.lastPlayedAt > local.lastPlayedAt) remote.coverUrl else local.coverUrl
+                            coverUrl = if (remote.lastPlayedAt > local.lastPlayedAt) remote.coverUrl else local.coverUrl,
+                            matchedAlbum = if (remote.lastPlayedAt > local.lastPlayedAt) remote.matchedAlbum else local.matchedAlbum
                         )
                     }
                 }
@@ -324,8 +360,13 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
 
     private fun shouldKeepLocalAfterClear(stat: TrackStat, playbackStatsClearedAt: Long): Boolean {
         if (playbackStatsClearedAt <= 0L) return true
+        return stat.lastPlayedAt >= playbackStatsClearedAt
+    }
+
+    private fun shouldStartNewStatsEpoch(stat: TrackStat, playbackStatsClearedAt: Long): Boolean {
+        if (playbackStatsClearedAt <= 0L) return false
         val firstPlayedAt = stat.firstPlayedAt.takeIf { it > 0L } ?: stat.lastPlayedAt
-        return firstPlayedAt > playbackStatsClearedAt && stat.lastPlayedAt > playbackStatsClearedAt
+        return firstPlayedAt < playbackStatsClearedAt || stat.lastPlayedAt < playbackStatsClearedAt
     }
 
     companion object {

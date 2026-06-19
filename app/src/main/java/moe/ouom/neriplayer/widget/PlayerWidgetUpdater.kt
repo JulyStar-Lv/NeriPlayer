@@ -351,7 +351,7 @@ object PlayerWidgetUpdater {
         if (bitmap != null) {
             views.setImageViewBitmap(R.id.widget_cover, bitmap)
         } else {
-            views.setImageViewResource(R.id.widget_cover, R.mipmap.ic_launcher)
+            views.setImageViewResource(R.id.widget_cover, R.drawable.ic_launcher)
         }
     }
 

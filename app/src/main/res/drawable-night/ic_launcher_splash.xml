@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 120dp 外层弱光晕 -->
+    <item
+        android:gravity="center"
+        android:width="120dp"
+        android:height="120dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#FF292929"
+                android:endColor="#33121212">
+            </gradient>
+        </shape>
+    </item>
+
+    <!-- 100dp 内层光晕 -->
+    <item
+        android:gravity="center"
+        android:width="100dp"
+        android:height="100dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#FF292929"
+                android:endColor="#33121212">
+            </gradient>
+        </shape>
+    </item>
+
+    <!-- 88dp 主图标 -->
+    <item
+        android:drawable="@drawable/ic_launcher_round"
+        android:gravity="center"
+        android:width="80dp"
+        android:height="80dp" />
+
+</layer-list>

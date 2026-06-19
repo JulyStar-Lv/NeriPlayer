@@ -15,14 +15,15 @@ import moe.ouom.neriplayer.data.auth.youtube.YOUTUBE_MUSIC_ORIGIN
 import moe.ouom.neriplayer.data.settings.SettingsKeys
 import moe.ouom.neriplayer.data.settings.ThemePreferenceSnapshot
 import moe.ouom.neriplayer.data.settings.dataStore
-import moe.ouom.neriplayer.data.settings.generated.AutoSettingsBackupKeys
 import moe.ouom.neriplayer.data.settings.persistBootstrapSettingsSnapshot
 import moe.ouom.neriplayer.data.settings.persistPlaybackPreferenceSnapshot
 import moe.ouom.neriplayer.data.settings.persistThemePreferenceSnapshot
 import moe.ouom.neriplayer.data.settings.toBootstrapSettingsSnapshot
 import moe.ouom.neriplayer.data.settings.toPlaybackPreferenceSnapshot
+import moe.ouom.neriplayer.data.sync.github.GitHubSyncWorker
 import moe.ouom.neriplayer.data.sync.github.SecureTokenStorage
 import moe.ouom.neriplayer.data.sync.webdav.WebDavStorage
+import moe.ouom.neriplayer.data.sync.webdav.WebDavSyncWorker
 import moe.ouom.neriplayer.util.LanguageManager
 import moe.ouom.neriplayer.util.NPLogger
 
@@ -82,7 +83,7 @@ class ConfigFileManager(private val context: Context) {
             val payload = AppConfigBackupCodec.decode(raw)
             val warnings = mutableListOf<String>()
 
-            val sanitizedSettings = sanitizePortableSettings(payload.settings, warnings)
+            val sanitizedSettings = ConfigSettingsSanitizer(context).sanitize(payload.settings, warnings)
             restoreSettings(sanitizedSettings)
             AppContainer.listenTogetherPreferences.restore(payload.listenTogether)
 
@@ -93,8 +94,11 @@ class ConfigFileManager(private val context: Context) {
             }
 
             val restoredAuthCount = restoreAuth(payload, warnings)
-            SecureTokenStorage(context).restore(payload.gitHubSync)
-            WebDavStorage(context).restore(payload.webDavSync)
+            val gitHubStorage = SecureTokenStorage(context)
+            val webDavStorage = WebDavStorage(context)
+            gitHubStorage.restore(payload.gitHubSync)
+            webDavStorage.restore(payload.webDavSync)
+            reconcileSyncWorkers(gitHubStorage, webDavStorage)
 
             Result.success(
                 AppConfigImportResult(
@@ -183,47 +187,23 @@ class ConfigFileManager(private val context: Context) {
         return restoredCount
     }
 
-    private fun sanitizePortableSettings(
-        snapshot: TypedPreferenceSnapshot,
-        warnings: MutableList<String>
-    ): TypedPreferenceSnapshot {
-        val strings = LinkedHashMap(snapshot.strings)
-
-        val backgroundImageUri = strings[SettingsKeys.BACKGROUND_IMAGE_URI.name]
-        if (!backgroundImageUri.isNullOrBlank() && !canAccessImportedContentUri(backgroundImageUri)) {
-            strings.remove(SettingsKeys.BACKGROUND_IMAGE_URI.name)
-            warnings += context.getString(R.string.config_import_warning_background_image)
+    private fun reconcileSyncWorkers(
+        gitHubStorage: SecureTokenStorage,
+        webDavStorage: WebDavStorage
+    ) {
+        if (gitHubStorage.isConfigured() && gitHubStorage.isAutoSyncEnabled()) {
+            GitHubSyncWorker.schedulePeriodicSync(context)
+        } else {
+            GitHubSyncWorker.cancelAllSync(context)
         }
 
-        val downloadDirectoryUri = strings[SettingsKeys.DOWNLOAD_DIRECTORY_URI.name]
-        if (!downloadDirectoryUri.isNullOrBlank() && !hasPersistedTreeAccess(downloadDirectoryUri)) {
-            strings.remove(SettingsKeys.DOWNLOAD_DIRECTORY_URI.name)
-            strings.remove(SettingsKeys.DOWNLOAD_DIRECTORY_LABEL.name)
-            warnings += context.getString(R.string.config_import_warning_download_directory)
+        if (webDavStorage.isConfigured() && webDavStorage.isAutoSyncEnabled()) {
+            WebDavSyncWorker.schedulePeriodicSync(context)
+        } else {
+            WebDavSyncWorker.cancelAllSync(context)
         }
-
-        return snapshot.copy(strings = strings)
     }
 
-    private fun canAccessImportedContentUri(uriString: String): Boolean {
-        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return false
-        return runCatching {
-            context.contentResolver.openInputStream(uri)?.use { true } ?: false
-        }.getOrDefault(false)
-    }
-
-    private fun hasPersistedTreeAccess(uriString: String): Boolean {
-        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return false
-        val hasPersistedPermission = context.contentResolver.persistedUriPermissions.any { permission ->
-            permission.uri == uri && (permission.isReadPermission || permission.isWritePermission)
-        }
-        if (!hasPersistedPermission) {
-            return false
-        }
-        return runCatching {
-            DocumentFile.fromTreeUri(context, uri)?.exists() == true
-        }.getOrDefault(false)
-    }
 }
 
 private fun Preferences.toTypedPreferenceSnapshot(): TypedPreferenceSnapshot {
@@ -289,23 +269,3 @@ private fun <K, V> List<Pair<K, V>>.toMap(destination: LinkedHashMap<K, V>): Lin
     forEach { (key, value) -> destination[key] = value }
     return destination
 }
-
-private val SETTINGS_BOOLEAN_KEYS = listOf(
-    AutoSettingsBackupKeys.booleanKeys
-).flatten()
-
-private val SETTINGS_FLOAT_KEYS = listOf(
-    AutoSettingsBackupKeys.floatKeys
-).flatten()
-
-private val SETTINGS_INT_KEYS = listOf(
-    AutoSettingsBackupKeys.intKeys
-).flatten()
-
-private val SETTINGS_LONG_KEYS = listOf(
-    AutoSettingsBackupKeys.longKeys
-).flatten()
-
-private val SETTINGS_STRING_KEYS = listOf(
-    AutoSettingsBackupKeys.stringKeys
-).flatten()

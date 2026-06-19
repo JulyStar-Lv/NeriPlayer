@@ -94,6 +94,12 @@ class SourceLibraryRepository private constructor(private val context: Context) 
         }
     }
 
+    suspend fun removeSourceItem(source: String, id: Long) {
+        withContext(Dispatchers.IO) {
+            publish(_items.value.filterNot { it.source == source && it.id == id })
+        }
+    }
+
     companion object {
         @SuppressLint("StaticFieldLeak")
         @Volatile

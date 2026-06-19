@@ -389,6 +389,13 @@ fun LibraryScreen(
         manageSourcePlatform = platform
     }
 
+    fun removeSavedSource(source: String, id: Long, name: String) {
+        scope.launch {
+            sourceLibraryRepo.removeSourceItem(source, id)
+            showToast(context.getString(R.string.library_source_remove_saved_success, name))
+        }
+    }
+
     LaunchedEffect(initialTab, orderedTabs) {
         val targetPage = orderedTabs.indexOf(initialTab).takeIf { it >= 0 }
             ?: pagerState.currentPage.coerceIn(0, orderedTabs.lastIndex)
@@ -639,7 +646,8 @@ fun LibraryScreen(
                             onPlaylistClick = onNeteasePlaylistClick,
                             onAlbumClick = onNeteaseAlbumClick,
                             onAuthAction = { openNeteaseAuth() },
-                            onManageSource = { openSourceImport(LibraryAuthPlatform.NETEASE) }
+                            onManageSource = { openSourceImport(LibraryAuthPlatform.NETEASE) },
+                            onRemoveSavedSource = { id, name -> removeSavedSource("netease", id, name) }
                         )
 
                         LibraryTab.YTMUSIC -> YouTubeMusicPlaylistList(
@@ -648,6 +656,9 @@ fun LibraryScreen(
                             listState = youtubeMusicListState,
                             authUiState = youtubeAuth,
                             onClick = onYouTubeMusicPlaylistClick,
+                            onRemoveSavedSource = { playlist ->
+                                removeSavedSource("youtubeMusic", playlist.favoriteId(), playlist.title)
+                            },
                             onAuthAction = { openYouTubeAuth() },
                             onManageSource = { openSourceImport(LibraryAuthPlatform.YOUTUBE) },
                             onRetry = { vm.refreshYouTubeMusicPlaylists() }
@@ -667,6 +678,9 @@ fun LibraryScreen(
                                             selectedBiliFolder = playlist
                                         }
                                     },
+                                    onRemoveSavedSource = { playlist ->
+                                        removeSavedSource("bili", playlist.mediaId, playlist.title)
+                                    },
                                     onAuthAction = { openBiliAuth() },
                                     onManageSource = { openSourceImport(LibraryAuthPlatform.BILI) }
                                 )
@@ -678,6 +692,9 @@ fun LibraryScreen(
                                     error = ui.biliFolderCollectionErrors[folder.mediaId],
                                     listState = biliListState,
                                     onClick = onBiliPlaylistClick,
+                                    onRemove = { video ->
+                                        vm.removeBiliVideoFromFolder(folder, video)
+                                    },
                                     onNavigateUp = { selectedBiliFolder = null },
                                     onRetry = { vm.refreshBiliFolderCollections(folder) }
                                 )
@@ -1774,6 +1791,7 @@ private fun YouTubeMusicPlaylistList(
     listState: LazyListState,
     authUiState: PlatformAuthUiState,
     onClick: (YouTubeMusicPlaylist) -> Unit,
+    onRemoveSavedSource: (YouTubeMusicPlaylist) -> Unit,
     onAuthAction: () -> Unit,
     onManageSource: () -> Unit,
     onRetry: () -> Unit
@@ -1977,6 +1995,14 @@ private fun YouTubeMusicPlaylistList(
                         }
                     )
                     DropdownMenuItem(
+                        text = { Text(stringResource(R.string.library_source_remove_saved)) },
+                        onClick = {
+                            val target = playlist
+                            menuPlaylist = null
+                            onRemoveSavedSource(target)
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text(stringResource(R.string.library_youtube_music_copy_browse_id)) },
                         onClick = {
                             copyToClipboard("ytmusic_browse_id", playlist.browseId)
@@ -2006,10 +2032,15 @@ private fun BiliFolderCollectionList(
     error: String?,
     listState: LazyListState,
     onClick: (BiliPlaylist) -> Unit,
+    onRemove: suspend (BiliPlaylist) -> Result<Unit>,
     onNavigateUp: () -> Unit,
     onRetry: () -> Unit
 ) {
     val miniPlayerHeight = LocalMiniPlayerHeight.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var menuVideo by remember { mutableStateOf<BiliPlaylist?>(null) }
+    var removeTarget by remember { mutableStateOf<BiliPlaylist?>(null) }
 
     LazyColumn(
         state = listState,
@@ -2114,7 +2145,10 @@ private fun BiliFolderCollectionList(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
                     .animateItem()
                     .clip(cardShape)
-                    .clickable { onClick(collection) }
+                    .combinedClickable(
+                        onClick = { onClick(collection) },
+                        onLongClick = { menuVideo = collection }
+                    )
             ) {
                 ListItem(
                     headlineContent = {
@@ -2145,8 +2179,56 @@ private fun BiliFolderCollectionList(
                         }
                     }
                 )
+
+                DropdownMenu(
+                    expanded = menuVideo?.mediaId == collection.mediaId,
+                    onDismissRequest = { menuVideo = null }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.library_bili_remove_video)) },
+                        onClick = {
+                            menuVideo = null
+                            removeTarget = collection
+                        }
+                    )
+                }
             }
         }
+    }
+
+    removeTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { removeTarget = null },
+            title = { Text(stringResource(R.string.library_bili_remove_video)) },
+            text = { Text(stringResource(R.string.library_bili_remove_video_confirm, target.title)) },
+            confirmButton = {
+                HapticTextButton(
+                    onClick = {
+                        removeTarget = null
+                        scope.launch {
+                            val result = onRemove(target)
+                            val message = result.fold(
+                                onSuccess = { context.getString(R.string.library_bili_remove_video_success) },
+                                onFailure = {
+                                    context.getString(
+                                        R.string.library_bili_remove_video_failed,
+                                        it.message ?: it.javaClass.simpleName
+                                    )
+                                }
+                            )
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.library_bili_remove_video))
+                }
+            },
+            dismissButton = {
+                HapticTextButton(onClick = { removeTarget = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 }
 
@@ -2156,10 +2238,12 @@ private fun BiliPlaylistList(
     listState: LazyListState,
     authUiState: PlatformAuthUiState,
     onClick: (BiliPlaylist) -> Unit,
+    onRemoveSavedSource: (BiliPlaylist) -> Unit,
     onAuthAction: () -> Unit,
     onManageSource: () -> Unit
 ) {
     val miniPlayerHeight = LocalMiniPlayerHeight.current
+    var menuPlaylist by remember { mutableStateOf<BiliPlaylist?>(null) }
 
     LazyColumn(
         state = listState,
@@ -2197,7 +2281,10 @@ private fun BiliPlaylistList(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
                     .animateItem()
                     .clip(cardShape)
-                    .clickable { onClick(pl) }
+                    .combinedClickable(
+                        onClick = { onClick(pl) },
+                        onLongClick = { menuPlaylist = pl }
+                    )
             ) {
                 ListItem(
                     headlineContent = { Text(pl.title) },
@@ -2230,6 +2317,20 @@ private fun BiliPlaylistList(
                         }
                     }
                 )
+
+                DropdownMenu(
+                    expanded = menuPlaylist?.mediaId == pl.mediaId,
+                    onDismissRequest = { menuPlaylist = null }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.library_source_remove_saved)) },
+                        onClick = {
+                            val target = pl
+                            menuPlaylist = null
+                            onRemoveSavedSource(target)
+                        }
+                    )
+                }
             }
         }
     }
@@ -2878,11 +2979,14 @@ private fun NeteaseLibraryList(
     onPlaylistClick: (PlaylistSummary) -> Unit,
     onAlbumClick: (AlbumSummary) -> Unit,
     onAuthAction: () -> Unit,
-    onManageSource: () -> Unit
+    onManageSource: () -> Unit,
+    onRemoveSavedSource: (Long, String) -> Unit
 ) {
     val context = LocalContext.current
     val miniPlayerHeight = LocalMiniPlayerHeight.current
     val cardShape = RoundedCornerShape(12.dp)
+    var menuPlaylist by remember { mutableStateOf<PlaylistSummary?>(null) }
+    var menuAlbum by remember { mutableStateOf<AlbumSummary?>(null) }
 
     LazyColumn(
         state = listState,
@@ -2921,7 +3025,14 @@ private fun NeteaseLibraryList(
                     playlist = playlist,
                     context = context,
                     cardShape = cardShape,
-                    onClick = { onPlaylistClick(playlist) }
+                    menuExpanded = menuPlaylist?.id == playlist.id,
+                    onClick = { onPlaylistClick(playlist) },
+                    onLongClick = { menuPlaylist = playlist },
+                    onDismissMenu = { menuPlaylist = null },
+                    onRemoveSaved = {
+                        menuPlaylist = null
+                        onRemoveSavedSource(playlist.id, playlist.name)
+                    }
                 )
             }
         }
@@ -2940,7 +3051,14 @@ private fun NeteaseLibraryList(
                 NeteaseAlbumRow(
                     album = album,
                     cardShape = cardShape,
-                    onClick = { onAlbumClick(album) }
+                    menuExpanded = menuAlbum?.id == album.id,
+                    onClick = { onAlbumClick(album) },
+                    onLongClick = { menuAlbum = album },
+                    onDismissMenu = { menuAlbum = null },
+                    onRemoveSaved = {
+                        menuAlbum = null
+                        onRemoveSavedSource(album.id, album.name)
+                    }
                 )
             }
         }
@@ -2963,7 +3081,11 @@ private fun LazyItemScope.NeteasePlaylistRow(
     playlist: PlaylistSummary,
     context: Context,
     cardShape: RoundedCornerShape,
-    onClick: () -> Unit
+    menuExpanded: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onDismissMenu: () -> Unit,
+    onRemoveSaved: () -> Unit
 ) {
     Card(
         shape = cardShape,
@@ -2975,7 +3097,10 @@ private fun LazyItemScope.NeteasePlaylistRow(
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .animateItem()
             .clip(cardShape)
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         ListItem(
             headlineContent = { Text(playlist.name) },
@@ -3003,6 +3128,15 @@ private fun LazyItemScope.NeteasePlaylistRow(
                 )
             }
         )
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = onDismissMenu
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.library_source_remove_saved)) },
+                onClick = onRemoveSaved
+            )
+        }
     }
 }
 
@@ -3011,7 +3145,11 @@ private fun LazyItemScope.NeteasePlaylistRow(
 private fun LazyItemScope.NeteaseAlbumRow(
     album: AlbumSummary,
     cardShape: RoundedCornerShape,
-    onClick: () -> Unit
+    menuExpanded: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onDismissMenu: () -> Unit,
+    onRemoveSaved: () -> Unit
 ) {
     Card(
         shape = cardShape,
@@ -3023,7 +3161,10 @@ private fun LazyItemScope.NeteaseAlbumRow(
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .animateItem()
             .clip(cardShape)
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         ListItem(
             headlineContent = { Text(album.name) },
@@ -3047,6 +3188,15 @@ private fun LazyItemScope.NeteaseAlbumRow(
                 )
             }
         )
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = onDismissMenu
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.library_source_remove_saved)) },
+                onClick = onRemoveSaved
+            )
+        }
     }
 }
 

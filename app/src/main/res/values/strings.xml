@@ -97,6 +97,9 @@
     <string name="settings_config_importing">正在导入配置文件…</string>
     <string name="settings_config_export_success">配置导出成功</string>
     <string name="settings_config_export_failed">配置导出失败</string>
+    <string name="settings_config_export_warning_title">导出配置前请注意</string>
+    <string name="settings_config_export_warning_message">配置文件包含登录凭证、授权 Cookie、Token 和同步配置，只能用于个人迁移，不能分享给任何人。</string>
+    <string name="settings_config_export_warning_confirm">我已了解，继续导出</string>
     <string name="settings_config_import_success">配置导入完成</string>
     <string name="settings_config_import_failed">配置导入失败</string>
     <string name="settings_config_import_restored_settings">已恢复应用设置 %1$d 项</string>
@@ -108,6 +111,7 @@
     <string name="config_import_warning_netease_cookie">网易云登录信息校验失败，已跳过恢复</string>
     <string name="config_import_warning_background_image">自定义背景图片没有可用读取权限，已跳过恢复</string>
     <string name="config_import_warning_download_directory">下载目录没有可用访问权限，已跳过恢复</string>
+    <string name="config_import_warning_invalid_setting_values">部分设置项不可识别或值不合法，已跳过或恢复到安全范围</string>
     <string name="playlist_backup_date">备份时间: %s</string>
     <string name="playlist_analyzing">正在分析差异…</string>
     <string name="playlist_analysis_failed">分析失败: %s</string>
@@ -406,6 +410,8 @@
     <string name="quality_netease_default">网易云默认音质</string>
     <string name="quality_bili_default">B 站默认音质</string>
     <string name="quality_youtube_default">YouTube 默认音质</string>
+    <string name="settings_audio_quality_netease_member_quality_notice">如果没有会员，切换到无损及以上音质可能导致歌曲无法播放。</string>
+    <string name="settings_audio_quality_bili_dolby_notice">最高规格音质可能导致歌曲无法正确解析（除非歌曲默认支持杜比）。</string>
 
     <!-- Playback Device -->
     <string name="device_speaker">手机扬声器</string>
@@ -655,6 +661,29 @@
     <string name="startup_crash_report_title_native">检测到上次 Native 崩溃</string>
     <string name="startup_crash_report_desc">应用上次启动时发生崩溃，下面是日志预览。\n日志文件：%1$s</string>
     <string name="startup_crash_report_truncated">日志内容较长，这里只显示前 64 KB。你可以复制完整内容或导出原始文件。</string>
+    <string name="safe_mode_title">安全模式</string>
+    <string name="safe_mode_subtitle">检测到上次启动崩溃，已跳过所有应用组件加载。</string>
+    <string name="safe_mode_component_lock">当前只开放日志查看、日志导出、Cookie 清理、登录重置、设置重置和恢复正常启动。</string>
+    <string name="safe_mode_log_preview">崩溃日志预览</string>
+    <string name="safe_mode_log_file">日志文件：%1$s</string>
+    <string name="safe_mode_log_empty">暂无可查看的崩溃日志</string>
+    <string name="safe_mode_copy_log">复制日志</string>
+    <string name="safe_mode_export_log">导出日志</string>
+    <string name="safe_mode_reset_login">清空 Cookie 并重置登录</string>
+    <string name="safe_mode_reset_login_desc">将清除 WebView Cookie，以及网易云、Bili、YouTube 的本地登录状态。</string>
+    <string name="safe_mode_reset_login_confirm_title">确认重置登录状态？</string>
+    <string name="safe_mode_reset_login_confirm_message">此操作会清空本机保存的 Cookie 和网页登录存储，之后需要重新登录。</string>
+    <string name="safe_mode_reset_login_done">Cookie 和登录状态已重置</string>
+    <string name="safe_mode_reset_login_failed">重置失败：%1$s</string>
+    <string name="safe_mode_reset_settings">重置所有设置项</string>
+    <string name="safe_mode_reset_settings_desc">将所有应用设置恢复为默认值，不会清除登录状态和 Cookie。</string>
+    <string name="safe_mode_reset_settings_confirm_title">确认重置所有设置项？</string>
+    <string name="safe_mode_reset_settings_confirm_message">此操作会清空本机保存的应用设置，并重建启动快照。登录状态、Cookie 和账号信息不会被清除。</string>
+    <string name="safe_mode_reset_settings_done">所有设置项已重置</string>
+    <string name="safe_mode_reset_settings_failed">重置设置失败：%1$s</string>
+    <string name="safe_mode_restore_normal">恢复正常启动</string>
+    <string name="safe_mode_restore_normal_desc">清除本次崩溃标记并重新进入完整应用。如果问题仍存在，下次会再次进入安全模式。</string>
+    <string name="safe_mode_restore_failed">恢复失败：%1$s</string>
 
     <!-- Errors -->
     <string name="error_network">网络错误</string>
@@ -1394,6 +1423,13 @@
     <string name="library_bili_folder_load_failed">加载失败：%1$s</string>
     <string name="library_bili_folder_empty">这个文件夹里暂未找到视频</string>
     <string name="library_bili_collection">视频</string>
+    <string name="library_bili_remove_video">移除</string>
+    <string name="library_bili_remove_video_confirm">确定要从当前收藏夹移除“%1$s”吗？</string>
+    <string name="library_bili_remove_video_success">已移除</string>
+    <string name="library_bili_remove_video_failed">移除失败：%1$s</string>
+    <string name="library_bili_remove_invalid_videos">移除失效视频</string>
+    <string name="library_bili_remove_invalid_videos_confirm">确定要移除这个分组里的 %1$d 个失效视频吗？</string>
+    <string name="library_bili_remove_invalid_videos_failed">移除失效视频失败：%1$s</string>
     <string name="library_platform_accounts">平台账号</string>
     <string name="library_platform_accounts_desc">连接平台后，媒体库会自动载入歌单、收藏夹和专辑</string>
     <string name="library_platform_login">登录</string>
@@ -1403,6 +1439,8 @@
     <string name="library_source_import_empty">暂未加载到可导入的歌单</string>
     <string name="library_source_import_apply">保存选择（%1$d）</string>
     <string name="library_source_import_updated">已更新导入歌单</string>
+    <string name="library_source_remove_saved">取消保存</string>
+    <string name="library_source_remove_saved_success">已从媒体库移除“%1$s”</string>
     <string name="library_platform_import_playlists">%1$s 导入歌单</string>
     <string name="library_platform_manage_source_empty_hint">前往管理音源，选择要显示在此处的歌单</string>
     <string name="library_platform_connect_platform">连接 %1$s</string>

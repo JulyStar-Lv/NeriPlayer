@@ -38,7 +38,7 @@ internal fun normalizeLocalAlbumIdentity(
 }
 
 fun SongItem.displayAlbum(context: Context): String {
-    val normalized = album.trim()
+    val normalized = matchedAlbum?.trim()?.takeIf { it.isNotBlank() } ?: album.trim()
     if (normalized.isBlank()) return normalized
     return if (
         normalized == LocalSongSupport.LOCAL_ALBUM_IDENTITY ||

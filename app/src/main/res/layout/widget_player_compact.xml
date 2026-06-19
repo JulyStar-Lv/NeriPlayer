@@ -19,7 +19,7 @@
             android:alpha="1.0"
             android:contentDescription="@string/widget_player_cover_art"
             android:scaleType="centerCrop"
-            android:src="@mipmap/ic_launcher" />
+            android:src="@drawable/ic_launcher" />
 
         <TextView
             android:layout_width="match_parent"
