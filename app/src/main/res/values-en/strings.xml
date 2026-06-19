@@ -1408,6 +1408,13 @@
     <string name="library_bili_folder_load_failed">Load failed: %1$s</string>
     <string name="library_bili_folder_empty">No videos found in this folder</string>
     <string name="library_bili_collection">Video</string>
+    <string name="library_bili_remove_video">Remove</string>
+    <string name="library_bili_remove_video_confirm">Remove "%1$s" from this folder?</string>
+    <string name="library_bili_remove_video_success">Removed</string>
+    <string name="library_bili_remove_video_failed">Remove failed: %1$s</string>
+    <string name="library_bili_remove_invalid_videos">Remove invalid videos</string>
+    <string name="library_bili_remove_invalid_videos_confirm">Remove %1$d invalid videos from this group?</string>
+    <string name="library_bili_remove_invalid_videos_failed">Failed to remove invalid videos: %1$s</string>
     <string name="library_platform_accounts">Platform Accounts</string>
     <string name="library_platform_accounts_desc">Connect platforms and the library will load playlists, favorites, and albums automatically</string>
     <string name="library_platform_login">Sign in</string>
@@ -1417,6 +1424,8 @@
     <string name="library_source_import_empty">No importable playlists loaded yet</string>
     <string name="library_source_import_apply">Save Selection (%1$d)</string>
     <string name="library_source_import_updated">Imported playlists updated</string>
+    <string name="library_source_remove_saved">Unsave</string>
+    <string name="library_source_remove_saved_success">Removed "%1$s" from Library</string>
     <string name="library_platform_import_playlists">%1$s Imported Playlists</string>
     <string name="library_platform_manage_source_empty_hint">Manage sources to choose the playlists shown here</string>
     <string name="library_platform_connect_platform">Connect %1$s</string>

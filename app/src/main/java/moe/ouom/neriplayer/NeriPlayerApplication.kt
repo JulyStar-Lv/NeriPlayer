@@ -57,7 +57,7 @@ class NeriPlayerApplication : Application() {
         // related signals internally for JIT compilation and runtime checks. Intercepting
         // those signals from application code can break Android's libsigchain, especially
         // on vendor-modified ART builds. JVM crash logging and safe mode remain enabled.
-        ExceptionHandler.init(this, installNativeCrashHandler = false)
+        ExceptionHandler.init(this, installNativeCrashHandler = !enterSafeMode)
 
         if (enterSafeMode) {
             return

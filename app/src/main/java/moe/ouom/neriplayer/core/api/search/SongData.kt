@@ -29,6 +29,12 @@ enum class MusicPlatform {
     CLOUD_MUSIC, QQ_MUSIC
 }
 
+enum class SearchLyricsType {
+    NONE,
+    LINE,
+    WORD
+}
+
 @Serializable
 data class SongSearchInfo(
     val id: String,
@@ -37,7 +43,17 @@ data class SongSearchInfo(
     val duration: String,
     val source: MusicPlatform,
     val albumName: String?,
-    val coverUrl: String?
+    val coverUrl: String?,
+    val providerId: String? = null,
+    val matchScore: Double? = null,
+    val lyricsType: SearchLyricsType = SearchLyricsType.NONE,
+    val durationMs: Long? = null
+)
+
+data class MetadataSearchQuery(
+    val songName: String,
+    val songArtist: String = "",
+    val durationMs: Long? = null
 )
 
 @Serializable

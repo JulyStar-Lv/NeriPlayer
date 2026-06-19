@@ -226,8 +226,9 @@ dependencies {
     implementation(libs.newpipe.extractor)
     implementation(libs.okhttp)
 
-    implementation(project(":accompanist-lyrics-core"))
-    implementation(project(":accompanist-lyrics-ui"))
+    implementation(project(":lyrics-core"))
+    implementation(project(":lyrics-ui"))
+    implementation(project(":meta-data"))
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.serialization.protobuf)

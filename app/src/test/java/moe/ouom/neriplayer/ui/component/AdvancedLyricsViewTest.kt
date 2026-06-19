@@ -1,7 +1,7 @@
 package moe.ouom.neriplayer.ui.component
 
-import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
-import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
+import io.github.camtulip.metadata.lyrics.core.model.karaoke.KaraokeLine
+import io.github.camtulip.metadata.lyrics.core.model.synced.SyncedLine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -175,6 +175,21 @@ class AdvancedLyricsViewTest {
 
         val line = result.lines.single() as KaraokeLine.MainKaraokeLine
         assertEquals(3, line.syllables.size)
+    }
+
+    @Test
+    fun `buildAdvancedSyncedLyrics parses raw qq qrc lyrics as karaoke line`() {
+        val result = buildAdvancedSyncedLyrics(
+            rawLyrics = "[0,1000]逐字(0,500)歌词(500,500)",
+            rawTranslatedLyrics = null,
+            lyrics = emptyList(),
+            translatedLyrics = emptyList()
+        )
+
+        val line = result.lines.single() as KaraokeLine.MainKaraokeLine
+        assertEquals(listOf("逐字", "歌词"), line.syllables.map { it.content })
+        assertEquals(listOf(0, 500), line.syllables.map { it.start })
+        assertEquals(listOf(500, 1000), line.syllables.map { it.end })
     }
 
     @Test

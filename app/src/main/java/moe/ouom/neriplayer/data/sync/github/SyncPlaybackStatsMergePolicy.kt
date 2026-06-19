@@ -55,7 +55,8 @@ internal object SyncPlaybackStatsMergePolicy {
             durationMs = newer.durationMs,
             mediaUri = newer.mediaUri,
             id = newer.id,
-            albumId = newer.albumId
+            albumId = newer.albumId,
+            matchedAlbum = newer.matchedAlbum
         )
     }
 }

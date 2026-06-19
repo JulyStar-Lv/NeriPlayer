@@ -438,6 +438,7 @@ internal object ManagedDownloadStorage {
         val matchedTranslatedLyric: String? = null,
         val matchedLyricSource: String? = null,
         val matchedSongId: String? = null,
+        val matchedAlbum: String? = null,
         val userLyricOffsetMs: Long = 0L,
         val customCoverUrl: String? = null,
         val customName: String? = null,
@@ -3354,6 +3355,7 @@ internal object ManagedDownloadStorage {
             put("matchedTranslatedLyric", matchedTranslatedLyric)
             put("matchedLyricSource", matchedLyricSource)
             put("matchedSongId", matchedSongId)
+            put("matchedAlbum", matchedAlbum)
             put("userLyricOffsetMs", userLyricOffsetMs)
             put("customCoverUrl", customCoverUrl)
             put("customName", customName)
@@ -3386,6 +3388,7 @@ internal object ManagedDownloadStorage {
             matchedTranslatedLyric = optPresentString("matchedTranslatedLyric"),
             matchedLyricSource = optString("matchedLyricSource").takeIf(String::isNotBlank),
             matchedSongId = optString("matchedSongId").takeIf(String::isNotBlank),
+            matchedAlbum = optString("matchedAlbum").takeIf(String::isNotBlank),
             userLyricOffsetMs = optLong("userLyricOffsetMs"),
             customCoverUrl = optString("customCoverUrl").takeIf(String::isNotBlank),
             customName = optString("customName").takeIf(String::isNotBlank),

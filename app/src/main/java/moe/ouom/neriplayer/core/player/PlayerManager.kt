@@ -304,6 +304,7 @@ object PlayerManager {
     val playlistsFlow: StateFlow<List<LocalPlaylist>> = _playlistsFlow
 
     internal var playJob: Job? = null
+    internal var currentMetadataAutoSearchJob: Job? = null
     internal var currentYouTubePrefetchJob: Job? = null
     internal val youtubeStreamWarmupJobs = ConcurrentHashMap<String, Job>()
     @Volatile
@@ -1391,8 +1392,9 @@ internal fun cancelVolumeFade(resetToFull: Boolean = false) =
     fun replaceMetadataFromSearch(
         originalSong: SongItem,
         selectedSong: SongSearchInfo,
-        isAuto: Boolean = false
-    ) = replaceMetadataFromSearchImpl(originalSong, selectedSong, isAuto)
+        isAuto: Boolean = false,
+        requestToken: Long? = null
+    ) = replaceMetadataFromSearchImpl(originalSong, selectedSong, isAuto, requestToken)
 
     fun updateSongCustomInfo(
         originalSong: SongItem,

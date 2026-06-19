@@ -161,6 +161,7 @@ class YouTubeMusicPlaylistDetailViewModel(application: Application) : AndroidVie
             matchedTranslatedLyric = editedSong.matchedTranslatedLyric ?: baseSong.matchedTranslatedLyric,
             matchedLyricSource = editedSong.matchedLyricSource ?: baseSong.matchedLyricSource,
             matchedSongId = editedSong.matchedSongId ?: baseSong.matchedSongId,
+            matchedAlbum = editedSong.matchedAlbum ?: baseSong.matchedAlbum,
             userLyricOffsetMs = editedSong.userLyricOffsetMs,
             customCoverUrl = editedSong.customCoverUrl,
             customName = editedSong.customName,

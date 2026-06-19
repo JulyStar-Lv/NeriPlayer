@@ -765,6 +765,7 @@ object GlobalDownloadManager {
             matchedTranslatedLyric = matchedTranslatedLyric,
             matchedLyricSource = metadata?.matchedLyricSource,
             matchedSongId = metadata?.matchedSongId,
+            matchedAlbum = metadata?.matchedAlbum,
             userLyricOffsetMs = metadata?.userLyricOffsetMs ?: 0L,
             customCoverUrl = metadata?.customCoverUrl,
             customName = metadata?.customName,
@@ -839,6 +840,7 @@ object GlobalDownloadManager {
             put("matchedTranslatedLyric", song.matchedTranslatedLyric)
             put("matchedLyricSource", song.matchedLyricSource?.name)
             put("matchedSongId", song.matchedSongId)
+            put("matchedAlbum", song.matchedAlbum)
             put("userLyricOffsetMs", song.userLyricOffsetMs)
             put("customCoverUrl", song.customCoverUrl)
             put("customName", song.customName)
@@ -1356,6 +1358,7 @@ object GlobalDownloadManager {
                 runCatching { MusicPlatform.valueOf(it) }.getOrNull()
             },
             matchedSongId = matchedSongId,
+            matchedAlbum = matchedAlbum,
             userLyricOffsetMs = userLyricOffsetMs,
             customCoverUrl = customCoverUrl,
             customName = customName,
@@ -2124,6 +2127,7 @@ object GlobalDownloadManager {
             matchedTranslatedLyric = song.matchedTranslatedLyric,
             matchedLyricSource = song.matchedLyricSource?.name,
             matchedSongId = song.matchedSongId,
+            matchedAlbum = song.matchedAlbum,
             userLyricOffsetMs = song.userLyricOffsetMs,
             customCoverUrl = song.customCoverUrl,
             customName = song.customName,
@@ -2599,6 +2603,7 @@ internal fun serializeDownloadedSongsCatalog(
                         put("coverUrl", song.coverUrl)
                         put("matchedLyricSource", song.matchedLyricSource)
                         put("matchedSongId", song.matchedSongId)
+                        put("matchedAlbum", song.matchedAlbum)
                         put("userLyricOffsetMs", song.userLyricOffsetMs)
                         put("customCoverUrl", song.customCoverUrl)
                         put("customName", song.customName)
@@ -2643,6 +2648,7 @@ internal fun deserializeDownloadedSongsCatalog(
                     matchedTranslatedLyric = item.optString("matchedTranslatedLyric").takeIf(String::isNotBlank),
                     matchedLyricSource = item.optString("matchedLyricSource").takeIf(String::isNotBlank),
                     matchedSongId = item.optString("matchedSongId").takeIf(String::isNotBlank),
+                    matchedAlbum = item.optString("matchedAlbum").takeIf(String::isNotBlank),
                     userLyricOffsetMs = item.optLong("userLyricOffsetMs"),
                     customCoverUrl = item.optString("customCoverUrl").takeIf(String::isNotBlank),
                     customName = item.optString("customName").takeIf(String::isNotBlank),
@@ -2675,6 +2681,7 @@ data class DownloadedSong(
     val matchedTranslatedLyric: String? = null,
     val matchedLyricSource: String? = null,
     val matchedSongId: String? = null,
+    val matchedAlbum: String? = null,
     val userLyricOffsetMs: Long = 0L,
     val customCoverUrl: String? = null,
     val customName: String? = null,

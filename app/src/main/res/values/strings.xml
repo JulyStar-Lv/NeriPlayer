@@ -1423,6 +1423,13 @@
     <string name="library_bili_folder_load_failed">加载失败：%1$s</string>
     <string name="library_bili_folder_empty">这个文件夹里暂未找到视频</string>
     <string name="library_bili_collection">视频</string>
+    <string name="library_bili_remove_video">移除</string>
+    <string name="library_bili_remove_video_confirm">确定要从当前收藏夹移除“%1$s”吗？</string>
+    <string name="library_bili_remove_video_success">已移除</string>
+    <string name="library_bili_remove_video_failed">移除失败：%1$s</string>
+    <string name="library_bili_remove_invalid_videos">移除失效视频</string>
+    <string name="library_bili_remove_invalid_videos_confirm">确定要移除这个分组里的 %1$d 个失效视频吗？</string>
+    <string name="library_bili_remove_invalid_videos_failed">移除失效视频失败：%1$s</string>
     <string name="library_platform_accounts">平台账号</string>
     <string name="library_platform_accounts_desc">连接平台后，媒体库会自动载入歌单、收藏夹和专辑</string>
     <string name="library_platform_login">登录</string>
@@ -1432,6 +1439,8 @@
     <string name="library_source_import_empty">暂未加载到可导入的歌单</string>
     <string name="library_source_import_apply">保存选择（%1$d）</string>
     <string name="library_source_import_updated">已更新导入歌单</string>
+    <string name="library_source_remove_saved">取消保存</string>
+    <string name="library_source_remove_saved_success">已从媒体库移除“%1$s”</string>
     <string name="library_platform_import_playlists">%1$s 导入歌单</string>
     <string name="library_platform_manage_source_empty_hint">前往管理音源，选择要显示在此处的歌单</string>
     <string name="library_platform_connect_platform">连接 %1$s</string>

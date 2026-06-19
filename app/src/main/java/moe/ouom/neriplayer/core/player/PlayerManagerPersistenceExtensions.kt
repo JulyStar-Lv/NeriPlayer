@@ -7,6 +7,7 @@ import android.os.SystemClock
 import android.widget.Toast
 import androidx.media3.common.Player
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -17,9 +18,14 @@ import moe.ouom.neriplayer.core.api.search.MusicPlatform
 import moe.ouom.neriplayer.core.api.search.SongSearchInfo
 import moe.ouom.neriplayer.core.di.AppContainer
 import moe.ouom.neriplayer.core.download.GlobalDownloadManager
+import moe.ouom.neriplayer.core.player.metadata.applyAutoSearchMetadata
 import moe.ouom.neriplayer.core.player.metadata.applyManualSearchMetadata
+import moe.ouom.neriplayer.core.player.metadata.isBiliMetadataSource
 import moe.ouom.neriplayer.core.player.metadata.normalizeCustomMetadataValue
 import moe.ouom.neriplayer.core.player.metadata.PlayerLyricsProvider
+import moe.ouom.neriplayer.core.player.metadata.parseLyricsWithPlainTextFallback
+import moe.ouom.neriplayer.core.player.metadata.shouldAutoSearchMetadataForMissingLyrics
+import moe.ouom.neriplayer.core.player.metadata.toMetadataSearchQueries
 import moe.ouom.neriplayer.core.player.metadata.withUpdatedLyricsPreservingOriginal
 import moe.ouom.neriplayer.core.player.model.PersistedPlaybackState
 import moe.ouom.neriplayer.core.player.model.PersistedState
@@ -37,6 +43,7 @@ import moe.ouom.neriplayer.ui.component.LyricEntry
 import moe.ouom.neriplayer.ui.viewmodel.playlist.BiliVideoItem
 import moe.ouom.neriplayer.ui.viewmodel.playlist.SongItem
 import moe.ouom.neriplayer.util.NPLogger
+import moe.ouom.neriplayer.util.SearchManager
 import moe.ouom.neriplayer.data.model.sameIdentityAs
 import java.io.File
 import java.lang.reflect.Type
@@ -490,7 +497,7 @@ internal suspend fun PlayerManager.getTranslatedLyricsImpl(song: SongItem): List
 }
 
 internal suspend fun PlayerManager.getLyricsImpl(song: SongItem): List<LyricEntry> {
-    return PlayerLyricsProvider.getLyrics(
+    val resolvedLyrics = PlayerLyricsProvider.getLyrics(
         song = song,
         application = application,
         neteaseClient = neteaseClient,
@@ -500,6 +507,62 @@ internal suspend fun PlayerManager.getLyricsImpl(song: SongItem): List<LyricEntr
         ytMusicLyricsCache = ytMusicLyricsCache,
         biliSourceTag = BILI_SOURCE_TAG
     )
+    if (resolvedLyrics.isNotEmpty() || song.matchedLyric != null || song.originalLyric != null) {
+        return resolvedLyrics
+    }
+    return getMetadataLibraryLyrics(song)
+}
+
+private suspend fun PlayerManager.getMetadataLibraryLyrics(song: SongItem): List<LyricEntry> {
+    if (!shouldAutoSearchMetadataForMissingLyrics(
+            song = song,
+            isLocalSong = isLocalSong(song),
+            isBiliSong = song.isBiliMetadataSource(BILI_SOURCE_TAG)
+        )
+    ) {
+        return emptyList()
+    }
+
+    val requestToken = playbackRequestToken
+    val isBiliSong = song.isBiliMetadataSource(BILI_SOURCE_TAG)
+    val match = SearchManager.findFirstSongDetails(
+        searchQueries = song.toMetadataSearchQueries(isBiliSong = isBiliSong),
+        requireLyrics = true
+    ) ?: return emptyList()
+
+    val rawLyrics = match.details.lyric ?: return emptyList()
+    val entries = runCatching {
+        parseLyricsWithPlainTextFallback(rawLyrics, song.durationMs)
+    }.onFailure {
+        NPLogger.w(
+            "NERI-PlayerManager",
+            "metadata library lyrics parse failed: song=${song.name}, provider=${match.candidate.providerId}, id=${match.candidate.id}, error=${it.message}"
+        )
+    }.getOrDefault(emptyList())
+
+    if (entries.isEmpty()) {
+        return emptyList()
+    }
+
+    val latestSong = _currentSongFlow.value
+    if (latestSong != null && requestToken == playbackRequestToken && latestSong.sameIdentityAs(song)) {
+        val updatedSong = applyAutoSearchMetadata(
+            originalSong = latestSong,
+            songName = match.details.songName,
+            singer = match.details.singer,
+            coverUrl = match.details.coverUrl,
+            album = match.details.album,
+            lyric = rawLyrics,
+            translatedLyric = match.details.translatedLyric,
+            matchedSource = match.candidate.source,
+            matchedSongId = match.candidate.id
+        )
+        updateSongInAllPlaces(latestSong, updatedSong)
+    } else {
+        return emptyList()
+    }
+
+    return entries
 }
 
 internal fun PlayerManager.playFromQueueImpl(
@@ -710,46 +773,66 @@ internal fun PlayerManager.suppressFutureAutoResumeForCurrentSessionImpl(
 internal fun PlayerManager.replaceMetadataFromSearchImpl(
     originalSong: SongItem,
     selectedSong: SongSearchInfo,
-    isAuto: Boolean = false
+    isAuto: Boolean = false,
+    requestToken: Long? = null
 ) {
     ioScope.launch {
         NPLogger.d(
             "NERI-PlayerManager",
-            "replaceMetadataFromSearch: originalSong=${originalSong.name}, selectedId=${selectedSong.id}, source=${selectedSong.source}, isAuto=$isAuto, stack=[${debugStackHint()}]"
+            "replaceMetadataFromSearch: originalSong=${originalSong.name}, selectedId=${selectedSong.id}, provider=${selectedSong.providerId}, source=${selectedSong.source}, isAuto=$isAuto, stack=[${debugStackHint()}]"
         )
-        val platform = selectedSong.source
-
-        val api = when (platform) {
-            MusicPlatform.CLOUD_MUSIC -> cloudMusicSearchApi
-            MusicPlatform.QQ_MUSIC -> qqMusicSearchApi
-        }
 
         try {
-            val newDetails = api.getSongInfo(selectedSong.id)
+            val activeOriginalSong = if (requestToken != null) {
+                val currentSong = _currentSongFlow.value ?: return@launch
+                if (requestToken != playbackRequestToken || !currentSong.sameIdentityAs(originalSong)) {
+                    return@launch
+                }
+                currentSong
+            } else {
+                originalSong
+            }
+            val newDetails = SearchManager.getSongInfo(selectedSong)
+            val targetSong = if (requestToken != null) {
+                val latestSong = _currentSongFlow.value ?: return@launch
+                if (requestToken != playbackRequestToken || !latestSong.sameIdentityAs(activeOriginalSong)) {
+                    return@launch
+                }
+                latestSong
+            } else {
+                activeOriginalSong
+            }
 
             val updatedSong = if (isAuto) {
-                originalSong.withUpdatedLyricsPreservingOriginal(
-                    newLyrics = newDetails.lyric ?: originalSong.matchedLyric,
-                    newTranslatedLyric = newDetails.translatedLyric ?: originalSong.matchedTranslatedLyric
-                ).copy(
-                    matchedLyricSource = selectedSong.source,
+                applyAutoSearchMetadata(
+                    originalSong = targetSong,
+                    songName = newDetails.songName,
+                    singer = newDetails.singer,
+                    coverUrl = newDetails.coverUrl,
+                    album = newDetails.album,
+                    lyric = newDetails.lyric,
+                    translatedLyric = newDetails.translatedLyric,
+                    matchedSource = selectedSong.source,
                     matchedSongId = selectedSong.id
                 )
             } else {
                 applyManualSearchMetadata(
-                    originalSong = originalSong,
+                    originalSong = targetSong,
                     songName = newDetails.songName,
                     singer = newDetails.singer,
                     coverUrl = newDetails.coverUrl,
+                    album = newDetails.album,
                     lyric = newDetails.lyric,
                     translatedLyric = newDetails.translatedLyric,
                     matchedSource = selectedSong.source,
                     matchedSongId = selectedSong.id,
-                    useCustomOverride = shouldApplySearchMetadataAsCustomOverride(originalSong)
+                    useCustomOverride = shouldApplySearchMetadataAsCustomOverride(targetSong)
                 )
             }
 
-            updateSongInAllPlaces(originalSong, updatedSong)
+            updateSongInAllPlaces(targetSong, updatedSong)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             mainScope.launch {
                 Toast.makeText(
@@ -1072,7 +1155,7 @@ internal suspend fun PlayerManager.updateSongLyricsAndTranslationImpl(
     NPLogger.d("PlayerManager", "updateSongLyricsAndTranslation completed")
 }
 
-private suspend fun PlayerManager.updateSongInAllPlaces(
+internal suspend fun PlayerManager.updateSongInAllPlaces(
     originalSong: SongItem,
     updatedSong: SongItem
 ) {

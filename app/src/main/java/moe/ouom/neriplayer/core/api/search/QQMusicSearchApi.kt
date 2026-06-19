@@ -103,7 +103,8 @@ class QQMusicSearchApi : SearchApi {
                     duration = formatDuration(song.interval),
                     source = MusicPlatform.QQ_MUSIC,
                     albumName = song.albumName,
-                    coverUrl = song.albumMid?.let { "https://y.qq.com/music/photo_new/T002R800x800M000$it.jpg" }
+                    coverUrl = song.albumMid?.let { "https://y.qq.com/music/photo_new/T002R800x800M000$it.jpg" },
+                    durationMs = song.interval * 1000L
                 )
             } ?: emptyList()
         }

@@ -33,8 +33,9 @@
             <option value="$PROJECT_DIR$/buildSrc" />
             <option value="$PROJECT_DIR$/ksp-annotations" />
             <option value="$PROJECT_DIR$/ksp-processor" />
-            <option value="$PROJECT_DIR$/np-submodule/accompanist-lyrics-core" />
-            <option value="$PROJECT_DIR$/np-submodule/accompanist-lyrics-ui/src" />
+            <option value="$PROJECT_DIR$/np-submodule/lyrics-core" />
+            <option value="$PROJECT_DIR$/np-submodule/lyrics-ui" />
+            <option value="$PROJECT_DIR$/np-submodule/meta-data" />
           </set>
         </option>
       </GradleProjectSettings>

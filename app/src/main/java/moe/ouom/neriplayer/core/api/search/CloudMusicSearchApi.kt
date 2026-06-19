@@ -101,7 +101,8 @@ class CloudMusicSearchApi(private val neteaseClient: NeteaseClient) : SearchApi 
                     duration = formatDuration(song.duration / 1000),
                     source = MusicPlatform.CLOUD_MUSIC,
                     albumName = song.album.name,
-                    coverUrl = song.album.picUrl
+                    coverUrl = song.album.picUrl,
+                    durationMs = song.duration
                 )
             } ?: emptyList()
         }

@@ -1,9 +1,14 @@
 package moe.ouom.neriplayer.util
 
-import moe.ouom.neriplayer.core.api.search.MusicPlatform
-import moe.ouom.neriplayer.core.api.search.SearchApi
+import moe.ouom.neriplayer.core.api.search.MetadataLibrarySearchApi
+import moe.ouom.neriplayer.core.api.search.MetadataSearchQuery
+import moe.ouom.neriplayer.core.api.search.SongDetails
 import moe.ouom.neriplayer.core.api.search.SongSearchInfo
-import moe.ouom.neriplayer.core.di.AppContainer
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /*
  * NeriPlayer - A unified Android player for streaming music and videos from multiple online platforms.
@@ -28,128 +33,282 @@ import moe.ouom.neriplayer.core.di.AppContainer
  * Created: 2025/8/17
  */
 
-object SearchManager {
-    private const val MINIMUM_MATCH_SCORE = 60
+private const val AUTOMATIC_MATCH_SCORE = 0.70
+private const val AUTOMATIC_METADATA_LOAD_TIMEOUT_MS = 4_800L
+private const val AUTOMATIC_DETAIL_TIMEOUT_MS = 1_400L
+private const val AUTOMATIC_DETAIL_CANDIDATE_LIMIT = 6
+private const val AUTOMATIC_DETAIL_CANDIDATE_LIMIT_WITHOUT_LYRICS = 3
 
-    private val cloudMusicApi = AppContainer.cloudMusicSearchApi
-    private val qqMusicApi = AppContainer.qqMusicSearchApi
-    private val whitespaceRegex = Regex("\\s+")
-    private val artistSeparatorRegex = Regex(
-        "\\s*([/,\\u3001\\uFF0C&])\\s*|\\s+(feat\\.?|ft\\.?)\\s+|\\s+[xX]\\s+",
-        RegexOption.IGNORE_CASE
+object SearchManager {
+    private val metadataApi = MetadataLibrarySearchApi()
+
+    data class MetadataSongMatch(
+        val candidate: SongSearchInfo,
+        val details: SongDetails
     )
 
     suspend fun search(
         keyword: String,
-        platform: MusicPlatform,
+        durationMs: Long? = null
     ): List<SongSearchInfo> {
-        val api = if (platform == MusicPlatform.CLOUD_MUSIC) cloudMusicApi else qqMusicApi
-
-        NPLogger.d("SearchManager", "try to search $keyword")
+        NPLogger.d(
+            "SearchManager",
+            "try to search metadata library: $keyword, durationMs=${durationMs?.takeIf { it > 0L }}"
+        )
         return try {
-            api.search(keyword, page = 1).take(10)
+            metadataApi.search(keyword, page = 1, durationMs = durationMs).take(10)
         } catch (e: Exception) {
+            e.throwIfCancellation()
             NPLogger.e("SearchManager", "Failed to find match", e)
             emptyList()
         }
     }
 
+    suspend fun getSongInfo(selectedSong: SongSearchInfo): SongDetails {
+        return metadataApi.getSongInfo(selectedSong)
+    }
+
     suspend fun findBestSearchCandidate(
         songName: String,
-        songArtist: String
+        songArtist: String,
+        durationMs: Long? = null
     ): SongSearchInfo? {
-        NPLogger.d("SearchManager", "try to match $songName / $songArtist")
+        return withAutomaticMetadataTimeout("candidate") {
+            findConfidentSearchCandidates(
+                MetadataSearchQuery(songName, songArtist, durationMs)
+            ).firstOrNull()
+        }
+    }
 
-        val searchResults = buildList {
-            addAll(searchCandidates(songName, qqMusicApi, "qq"))
-            addAll(searchCandidates(songName, cloudMusicApi, "cloud"))
+    suspend fun findBestSongDetails(
+        songName: String,
+        songArtist: String,
+        durationMs: Long? = null,
+        requireLyrics: Boolean = false
+    ): MetadataSongMatch? {
+        return findBestSongDetails(
+            searchQueries = listOf(MetadataSearchQuery(songName, songArtist, durationMs)),
+            requireLyrics = requireLyrics
+        )
+    }
+
+    suspend fun findBestSongDetails(
+        searchQueries: List<MetadataSearchQuery>,
+        requireLyrics: Boolean = false
+    ): MetadataSongMatch? {
+        return withAutomaticMetadataTimeout("details") {
+            val candidates = findConfidentSearchCandidates(searchQueries)
+            loadBestSongDetails(candidates, requireLyrics)
+        }
+    }
+
+    suspend fun findFirstSongDetails(
+        songName: String,
+        songArtist: String,
+        durationMs: Long? = null,
+        requireLyrics: Boolean = false
+    ): MetadataSongMatch? {
+        return findFirstSongDetails(
+            searchQueries = listOf(MetadataSearchQuery(songName, songArtist, durationMs)),
+            requireLyrics = requireLyrics
+        )
+    }
+
+    suspend fun findFirstSongDetails(
+        searchQueries: List<MetadataSearchQuery>,
+        requireLyrics: Boolean = false
+    ): MetadataSongMatch? {
+        return withAutomaticMetadataTimeout("first details") {
+            val candidates = findConfidentSearchCandidates(searchQueries)
+            loadBestSongDetails(candidates, requireLyrics)
+        }
+    }
+
+    private suspend fun findConfidentSearchCandidates(
+        songName: String,
+        songArtist: String,
+        durationMs: Long?
+    ): List<SongSearchInfo> {
+        return findConfidentSearchCandidates(MetadataSearchQuery(songName, songArtist, durationMs))
+    }
+
+    private suspend fun findConfidentSearchCandidates(
+        searchQuery: MetadataSearchQuery
+    ): List<SongSearchInfo> =
+        findConfidentSearchCandidates(listOf(searchQuery))
+
+    private suspend fun findConfidentSearchCandidates(
+        searchQueries: List<MetadataSearchQuery>
+    ): List<SongSearchInfo> {
+        val normalizedQueries = searchQueries
+            .mapNotNull { it.normalized() }
+            .distinct()
+        if (normalizedQueries.isEmpty()) {
+            return emptyList()
+        }
+
+        val searchResults = coroutineScope {
+            normalizedQueries
+                .map { query ->
+                    async {
+                        searchMetadataCandidates(
+                            songName = query.songName,
+                            songArtist = query.songArtist,
+                            durationMs = query.durationMs
+                        )
+                    }
+                }
+                .awaitAll()
+                .flatten()
+                .dedupeMetadataCandidates()
         }
         if (searchResults.isEmpty()) {
-            return null
+            return emptyList()
         }
 
-        val normalizedSongName = normalizeText(songName)
-        val normalizedArtist = normalizeText(songArtist)
-        val normalizedArtists = normalizeArtists(songArtist)
-
-        val scoredResults = searchResults.mapIndexed { index, candidate ->
-            IndexedValue(
-                index = index,
-                value = candidate to scoreCandidate(
-                    candidate = candidate,
-                    targetSongName = normalizedSongName,
-                    targetArtist = normalizedArtist,
-                    targetArtists = normalizedArtists
-                )
-            )
+        val confident = searchResults.confidentMetadataCandidates()
+        if (confident.isNotEmpty()) {
+            return confident
         }
 
-        val bestScore = scoredResults.maxOfOrNull { it.value.second } ?: return null
-        if (bestScore < MINIMUM_MATCH_SCORE) {
-            NPLogger.d(
-                "SearchManager",
-                "No confident match for $songName / $songArtist, bestScore=$bestScore"
-            )
-            return null
-        }
-
-        return scoredResults.firstOrNull { it.value.second == bestScore }?.value?.first
+        val ranked = searchResults.rankedByMatchScore()
+        val bestScore = ranked.firstOrNull()?.matchScore ?: 0.0
+        NPLogger.d(
+            "SearchManager",
+            "No confident match for ${normalizedQueries.joinToString { "${it.songName}/${it.songArtist}" }}, bestScore=$bestScore"
+        )
+        return emptyList()
     }
 
-    private suspend fun searchCandidates(
-        keyword: String,
-        api: SearchApi,
-        label: String
+    private suspend fun loadBestSongDetails(
+        candidates: List<SongSearchInfo>,
+        requireLyrics: Boolean
+    ): MetadataSongMatch? {
+        if (candidates.isEmpty()) {
+            return null
+        }
+
+        val limit = if (requireLyrics) {
+            AUTOMATIC_DETAIL_CANDIDATE_LIMIT
+        } else {
+            AUTOMATIC_DETAIL_CANDIDATE_LIMIT_WITHOUT_LYRICS
+        }
+        val indexedMatches = coroutineScope {
+            candidates
+                .take(limit)
+                .mapIndexed { index, candidate ->
+                    async {
+                        val details = loadSongDetails(candidate)
+                        IndexedMetadataSongMatch(
+                            index = index,
+                            match = details?.let { MetadataSongMatch(candidate, it) }
+                        )
+                    }
+                }
+                .awaitAll()
+        }
+
+        return indexedMatches
+            .asSequence()
+            .filter { indexed ->
+                val details = indexed.match?.details ?: return@filter false
+                !requireLyrics || !details.lyric.isNullOrBlank()
+            }
+            .minByOrNull { it.index }
+            ?.match
+    }
+
+    private suspend fun searchMetadataCandidates(
+        songName: String,
+        songArtist: String,
+        durationMs: Long?
     ): List<SongSearchInfo> {
-        return runCatching { api.search(keyword, page = 1) }
-            .onFailure {
+        NPLogger.d("SearchManager", "try to match $songName / $songArtist")
+
+        return runCatching {
+            metadataApi.search(
+                songName = songName,
+                songArtist = songArtist,
+                durationMs = durationMs,
+                enrichDetails = false
+            )
+        }.onFailure {
+            it.throwIfCancellation()
+            NPLogger.w(
+                "SearchManager",
+                "Failed to search metadata library for $songName / $songArtist: ${it.message}"
+            )
+        }.getOrDefault(emptyList())
+    }
+
+    private suspend fun loadSongDetails(candidate: SongSearchInfo): SongDetails? {
+        return withTimeoutOrNull(AUTOMATIC_DETAIL_TIMEOUT_MS) {
+            runCatching {
+                getSongInfo(candidate)
+            }.onFailure {
+                it.throwIfCancellation()
                 NPLogger.w(
                     "SearchManager",
-                    "Failed to search $label for $keyword: ${it.message}"
+                    "Failed to load metadata detail for ${candidate.providerId}:${candidate.id}: ${it.message}"
                 )
-            }
-            .getOrDefault(emptyList())
-    }
-
-    private fun scoreCandidate(
-        candidate: SongSearchInfo,
-        targetSongName: String,
-        targetArtist: String,
-        targetArtists: Set<String>
-    ): Int {
-        val candidateSongName = normalizeText(candidate.songName)
-        val candidateArtist = normalizeText(candidate.singer)
-        val candidateArtists = normalizeArtists(candidate.singer)
-
-        var score = when {
-            candidateSongName == targetSongName -> 100
-            candidateSongName.contains(targetSongName) || targetSongName.contains(candidateSongName) -> 60
-            else -> 0
+            }.getOrNull()
         }
+    }
 
-        if (targetArtist.isNotBlank() || targetArtists.isNotEmpty()) {
-            score += when {
-                candidateArtist == targetArtist -> 40
-                candidateArtists.intersect(targetArtists).isNotEmpty() -> 25
-                candidateArtist.contains(targetArtist) || targetArtist.contains(candidateArtist) -> 15
-                else -> 0
-            }
+    private suspend fun <T> withAutomaticMetadataTimeout(
+        label: String,
+        block: suspend () -> T?
+    ): T? {
+        val startedAt = System.currentTimeMillis()
+        return withTimeoutOrNull(AUTOMATIC_METADATA_LOAD_TIMEOUT_MS) {
+            block()
+        }.also { result ->
+            val elapsedMs = System.currentTimeMillis() - startedAt
+            NPLogger.d(
+                "SearchManager",
+                "automatic metadata $label ${if (result == null) "finished without match" else "matched"} in ${elapsedMs}ms"
+            )
         }
-
-        if (!candidate.coverUrl.isNullOrBlank()) score += 2
-        if (!candidate.albumName.isNullOrBlank()) score += 1
-        return score
     }
 
-    private fun normalizeText(value: String): String {
-        return value.trim().lowercase().replace(whitespaceRegex, " ")
-    }
-
-    private fun normalizeArtists(value: String): Set<String> {
-        return artistSeparatorRegex.split(value)
-            .asSequence()
-            .map(::normalizeText)
-            .filter { it.isNotBlank() }
-            .toSet()
+    private fun Throwable.throwIfCancellation() {
+        if (this is CancellationException) {
+            throw this
+        }
     }
 }
+
+private data class IndexedMetadataSongMatch(
+    val index: Int,
+    val match: SearchManager.MetadataSongMatch?
+)
+
+internal fun List<SongSearchInfo>.confidentMetadataCandidates(
+    minimumMatchScore: Double = AUTOMATIC_MATCH_SCORE
+): List<SongSearchInfo> {
+    val ranked = rankedByMatchScore()
+    val bestScore = ranked.firstOrNull()?.matchScore ?: return emptyList()
+    if (bestScore < minimumMatchScore) return emptyList()
+
+    return ranked.filter { (it.matchScore ?: 0.0) >= minimumMatchScore }
+}
+
+private fun MetadataSearchQuery.normalized(): MetadataSearchQuery? {
+    val normalizedName = songName.trim().takeIf { it.isNotBlank() } ?: return null
+    return copy(
+        songName = normalizedName,
+        songArtist = songArtist.trim(),
+        durationMs = durationMs?.takeIf { it > 0L }
+    )
+}
+
+private fun List<SongSearchInfo>.dedupeMetadataCandidates(): List<SongSearchInfo> =
+    groupBy { "${it.providerId ?: it.source.name}:${it.id}" }
+        .values
+        .mapNotNull { candidates ->
+            candidates.maxWithOrNull(compareBy<SongSearchInfo> { it.matchScore ?: 0.0 })
+        }
+        .rankedByMatchScore()
+
+private fun List<SongSearchInfo>.rankedByMatchScore(): List<SongSearchInfo> =
+    sortedByDescending { it.matchScore ?: 0.0 }

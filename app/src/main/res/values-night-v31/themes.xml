@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Base.Theme.NeriPlayer" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowBackground">@drawable/splash_window_background</item>
+        <item name="android:windowBackground">#FF121212</item>
         <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
@@ -9,7 +9,7 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowSplashScreenBackground">#FF121212</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_neriplayer_splash</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_splash</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
         <item name="android:windowSplashScreenAnimationDuration">450</item>
     </style>

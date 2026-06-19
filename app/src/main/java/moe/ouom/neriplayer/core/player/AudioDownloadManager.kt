@@ -1526,6 +1526,7 @@ object AudioDownloadManager {
             put("matchedTranslatedLyric", song.matchedTranslatedLyric)
             put("matchedLyricSource", song.matchedLyricSource?.name)
             put("matchedSongId", song.matchedSongId)
+            put("matchedAlbum", song.matchedAlbum)
             put("userLyricOffsetMs", song.userLyricOffsetMs)
             put("customCoverUrl", song.customCoverUrl)
             put("customName", song.customName)
@@ -2417,5 +2418,4 @@ internal fun resolveVisibleDownloadFileName(
         ?.takeIf(String::isNotBlank)
         ?: fallbackTempFileName
 }
-
 

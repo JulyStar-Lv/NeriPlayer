@@ -39,6 +39,7 @@ data class TrackStat(
     val customName: String?,
     val customArtist: String?,
     val customCoverUrl: String?,
+    val matchedAlbum: String? = null,
     val identityKey: String
 )
 
@@ -177,7 +178,8 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                         localFileName = song.localFileName,
                         customName = song.customName,
                         customArtist = song.customArtist,
-                        customCoverUrl = song.customCoverUrl
+                        customCoverUrl = song.customCoverUrl,
+                        matchedAlbum = song.matchedAlbum
                     )
                 }
             } else {
@@ -232,6 +234,7 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
             customName = song.customName,
             customArtist = song.customArtist,
             customCoverUrl = song.customCoverUrl,
+            matchedAlbum = song.matchedAlbum,
             identityKey = key
         )
     }
@@ -319,6 +322,7 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                             customName = null,
                             customArtist = null,
                             customCoverUrl = null,
+                            matchedAlbum = remote.matchedAlbum,
                             identityKey = remote.identityKey
                         )
                     } else {
@@ -329,7 +333,8 @@ class PlaybackStatsRepository private constructor(private val app: Context) {
                             firstPlayedAt = minOf(local.firstPlayedAt, remote.firstPlayedAt),
                             name = if (remote.lastPlayedAt > local.lastPlayedAt) remote.name else local.name,
                             artist = if (remote.lastPlayedAt > local.lastPlayedAt) remote.artist else local.artist,
-                            coverUrl = if (remote.lastPlayedAt > local.lastPlayedAt) remote.coverUrl else local.coverUrl
+                            coverUrl = if (remote.lastPlayedAt > local.lastPlayedAt) remote.coverUrl else local.coverUrl,
+                            matchedAlbum = if (remote.lastPlayedAt > local.lastPlayedAt) remote.matchedAlbum else local.matchedAlbum
                         )
                     }
                 }

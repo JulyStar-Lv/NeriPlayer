@@ -347,6 +347,7 @@ class GitHubSyncManager private constructor(context: Context) {
                         mediaUri = LocalSongSupport.sanitizeMediaUriForSync(playedEntry.mediaUri),
                         matchedLyric = playedEntry.matchedLyric,
                         matchedTranslatedLyric = playedEntry.matchedTranslatedLyric,
+                        matchedAlbum = playedEntry.matchedAlbum,
                         customCoverUrl = playedEntry.customCoverUrl,
                         customName = playedEntry.customName,
                         customArtist = playedEntry.customArtist,
@@ -791,6 +792,7 @@ class GitHubSyncManager private constructor(context: Context) {
                     mediaUri = LocalSongSupport.sanitizeMediaUriForSync(syncPlay.song.mediaUri),
                     matchedLyric = syncPlay.song.matchedLyric,
                     matchedTranslatedLyric = syncPlay.song.matchedTranslatedLyric,
+                    matchedAlbum = syncPlay.song.matchedAlbum,
                     customCoverUrl = syncPlay.song.customCoverUrl,
                     customName = syncPlay.song.customName,
                     customArtist = syncPlay.song.customArtist,
@@ -979,6 +981,7 @@ class GitHubSyncManager private constructor(context: Context) {
             a.matchedTranslatedLyric == b.matchedTranslatedLyric &&
             a.matchedLyricSource == b.matchedLyricSource &&
             a.matchedSongId == b.matchedSongId &&
+            a.matchedAlbum == b.matchedAlbum &&
             a.userLyricOffsetMs == b.userLyricOffsetMs &&
             a.customCoverUrl == b.customCoverUrl &&
             a.customName == b.customName &&

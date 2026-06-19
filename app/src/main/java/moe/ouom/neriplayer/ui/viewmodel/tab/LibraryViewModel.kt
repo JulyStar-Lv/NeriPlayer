@@ -46,6 +46,7 @@ import java.io.IOException
 
 private const val BILI_FOLDER_PAGE_SIZE = 20
 private const val BILI_FOLDER_PAGE_FETCH_BATCH_SIZE = 4
+private const val BILI_INVALID_FOLDER_TITLE_MARKER = "失效"
 
 /** 媒体库页面 UI 状态 */
 data class LibraryUiState(
@@ -281,6 +282,63 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     biliFolderCollectionErrors = _uiState.value.biliFolderCollectionErrors + (folderId to (e.message ?: e.javaClass.simpleName))
                 )
             }
+        }
+    }
+
+    suspend fun removeBiliVideoFromFolder(folder: BiliPlaylist, video: BiliPlaylist): Result<Unit> {
+        if (video.fid != BILI_SINGLE_VIDEO_FID || video.mediaId == 0L) {
+            return Result.failure(IllegalArgumentException("Unsupported Bilibili favorite item"))
+        }
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                biliClient.removeVideoFromFavFolder(folder.mediaId, video.mediaId)
+            }
+            val current = _uiState.value
+            val updatedCollections = current.biliFolderCollections[folder.mediaId]
+                ?.filterNot { it.mediaId == video.mediaId }
+            val updatedTopFolders = current.biliPlaylists.map { playlist ->
+                if (playlist.mediaId == folder.mediaId) {
+                    playlist.copy(count = (playlist.count - 1).coerceAtLeast(0))
+                } else {
+                    playlist
+                }
+            }
+            _uiState.value = current.copy(
+                biliPlaylists = updatedTopFolders,
+                biliFolderCollections = if (updatedCollections != null) {
+                    current.biliFolderCollections + (folder.mediaId to updatedCollections)
+                } else {
+                    current.biliFolderCollections
+                }
+            )
+        }
+    }
+
+    suspend fun removeInvalidBiliFolderVideos(folder: BiliPlaylist): Result<Int> {
+        if (!folder.title.contains(BILI_INVALID_FOLDER_TITLE_MARKER)) {
+            return Result.failure(IllegalArgumentException("Only invalid Bilibili folders can be cleaned"))
+        }
+        return runCatching {
+            val items = withContext(Dispatchers.IO) {
+                biliClient.getAllFavFolderItems(folder.mediaId)
+            }
+            items.forEach { item ->
+                withContext(Dispatchers.IO) {
+                    biliClient.removeResourceFromFavFolder(
+                        mediaId = folder.mediaId,
+                        rid = item.id,
+                        type = item.type
+                    )
+                }
+            }
+            val current = _uiState.value
+            _uiState.value = current.copy(
+                biliPlaylists = current.biliPlaylists.filterNot { it.mediaId == folder.mediaId },
+                biliFolderCollections = current.biliFolderCollections - folder.mediaId,
+                biliFolderCollectionErrors = current.biliFolderCollectionErrors - folder.mediaId,
+                biliFolderCollectionLoading = current.biliFolderCollectionLoading - folder.mediaId
+            )
+            items.size
         }
     }
 

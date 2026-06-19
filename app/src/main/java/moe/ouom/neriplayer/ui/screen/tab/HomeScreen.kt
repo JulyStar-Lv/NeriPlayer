@@ -766,10 +766,7 @@ private fun SongRowMini(
                 style = MaterialTheme.typography.titleSmall
             )
             Text(
-                text = listOfNotNull(
-                    song.displayArtist().takeIf { it.isNotBlank() },
-                    song.displayAlbum(context).takeIf { it.isNotBlank() }
-                ).joinToString(" / "),
+                text = song.homeSongSubtitle(context),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
@@ -778,6 +775,25 @@ private fun SongRowMini(
         }
 
     }
+}
+
+private fun SongItem.homeSongSubtitle(context: android.content.Context): String {
+    return listOfNotNull(
+        displayArtist().trim().takeIf { it.isNotBlank() },
+        displayAlbum(context).toHomeDisplayAlbum()
+    ).joinToString(" · ")
+}
+
+private fun String.toHomeDisplayAlbum(): String? {
+    val normalized = trim()
+    if (normalized.isBlank()) return null
+    if (normalized.equals("Bilibili", ignoreCase = true)) return null
+    if (normalized.startsWith("Bilibili|", ignoreCase = true)) return null
+    if (normalized.equals("Netease", ignoreCase = true)) return null
+    if (normalized.startsWith("Netease", ignoreCase = true)) {
+        return normalized.removePrefix("Netease").trim().takeIf { it.isNotBlank() }
+    }
+    return normalized
 }
 
 @OptIn(ExperimentalFoundationApi::class)

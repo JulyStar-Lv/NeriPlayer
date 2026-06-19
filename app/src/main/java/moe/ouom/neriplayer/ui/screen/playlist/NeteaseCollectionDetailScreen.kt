@@ -142,6 +142,7 @@ import moe.ouom.neriplayer.core.download.GlobalDownloadManager
 import moe.ouom.neriplayer.core.download.hasPendingDownloadTasks
 import moe.ouom.neriplayer.core.player.AudioDownloadManager
 import moe.ouom.neriplayer.core.player.PlayerManager
+import moe.ouom.neriplayer.data.local.media.displayAlbum
 import moe.ouom.neriplayer.data.local.playlist.LocalPlaylistRepository
 import moe.ouom.neriplayer.data.local.playlist.system.LocalFilesPlaylist
 import moe.ouom.neriplayer.data.model.displayArtist
@@ -954,8 +955,8 @@ private fun SongRow(
             )
             Text(
                 text = listOfNotNull(
-                    song.displayArtist().takeIf { it.isNotBlank() },
-                    (song.album.takeIf { it.isNotBlank() })?.replace("Netease", "") ?: ""
+                    song.displayArtist().trim().takeIf { it.isNotBlank() },
+                    song.displayAlbum(context).toCollectionDisplayAlbum()
                 ).joinToString(" · "),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1101,4 +1102,16 @@ fun PlayingIndicator(
             )
         }
     }
+}
+
+private fun String.toCollectionDisplayAlbum(): String? {
+    val normalized = trim()
+    if (normalized.isBlank()) return null
+    if (normalized.equals("Bilibili", ignoreCase = true)) return null
+    if (normalized.startsWith("Bilibili|", ignoreCase = true)) return null
+    if (normalized.equals("Netease", ignoreCase = true)) return null
+    if (normalized.startsWith("Netease", ignoreCase = true)) {
+        return normalized.removePrefix("Netease").trim().takeIf { it.isNotBlank() }
+    }
+    return normalized
 }
